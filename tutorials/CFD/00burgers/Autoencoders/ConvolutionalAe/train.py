@@ -20,12 +20,13 @@ def main(args):
     LEARNING_RATE = args.learning_rate
     ORDER = 4
     LOAD = eval(args.load)
+    SAVE = eval(args.save)
     checkpoint_dir = "./checkpoint/"
     model_dir = "./model/"
 
     # Device configuration
     device = torch.device('cuda' if eval(args.device) else 'cpu')
-    print("device is: ", device)
+    print("device is: ", device, "latent dim is: ", HIDDEN_DIM)
 
     # snapshots have to be clipped before
     snap_vec = np.load(WM_PROJECT + "npSnapshots.npy")
@@ -33,18 +34,21 @@ def main(args):
 
     # specify how many samples should be used for training and validation
     n_total = snap_vec.shape[1]
-    n_train = n_total-n_total//6
+    n_train = n_total-n_total//10
     print("Dimension of validation set: ", n_total-n_train)
 
     # scale the snapshots
-    nor = Normalize(snap_vec, center_fl=True)
+    nor = Normalize(snap_vec, center_fl=True, scale_fl=True)
     snap_framed = nor.framesnap(snap_vec)
     print("add constant solution: ", snap_framed.shape)
     snap_scaled = nor.scale(snap_framed)
     snaps_torch = torch.from_numpy(snap_scaled)
     print("snapshots shape", snap_scaled.shape)
     print("Min max after scaling: ", np.min(snap_scaled), np.max(snap_scaled))
-    # plot_snapshot(snap_scaled, 0)
+    # print(nor.rescale(snaps_torch.to(device), device).detach().cpu().numpy()[2500, 0, 0, 0], nor.rescale(snaps_torch.to(device), device).detach().cpu().numpy()[3000, 0, 59, 59])
+    # plot_snapshot(nor.rescale(snaps_torch.to(device), device).detach().cpu().numpy(), 3000)
+    # plot_snapshot(snaps_torch.detach().cpu().numpy(), 2500)
+
 
     # Test snapshots
     snap_true_vec = np.load(WM_PROJECT + "npTrueSnapshots.npy")
@@ -62,10 +66,6 @@ def main(args):
     # Data loader
     train_snap, val_torch = torch.utils.data.random_split(
         snaps_torch, [n_train, n_total - n_train])
-    # train_snap = train_snap[:]
-    # # print("train_snap size", train_snap.shape)
-    # train_snap = torch.cat((train_snap, torch.zeros((1 ,DIM, DOMAIN_SIZE, DOMAIN_SIZE))), axis=0)
-    # print("train_snap size", train_snap.shape)
 
     train_loader = torch.utils.data.DataLoader(dataset=train_snap,
                                                batch_size=BATCH_SIZE,
@@ -80,21 +80,25 @@ def main(args):
     model = AE(
         HIDDEN_DIM,
         scale=(nor.min_sn, nor.max_sn),
-        #mean=nor.mean(device),
+        mean=nor.mean(device),
         domain_size=DOMAIN_SIZE,
         use_cuda=args.device).to(device)
 
     # Loss and optimizer
     criterion = nn.MSELoss(reduction='sum')
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
     # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [500, 1500])
 
     # load model
     if LOAD is True:
         # ckp_path = "./checkpoint/checkpoint.pt"
         ckp_path = "./model/best_model.pt"
-        model, optimizer, start_epoch = load_ckp(ckp_path, model, optimizer)
+        model, _, start_epoch = load_ckp(ckp_path, model)
+        optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
+        print("loaded")
 
+    if SAVE is True:
         # Save the model checkpoint
         torch.save(model.state_dict(), 'model_' + str(HIDDEN_DIM) + '.ckpt')
 
@@ -112,8 +116,18 @@ def main(args):
         model.decoder.to(device)
         sm = torch.jit.script(model.decoder)
         sm.save('decoder_gpu_' + str(HIDDEN_DIM) + '.pt')
-        print("saved")
 
+        # reproduce in pytorch
+        # inputs_torch = torch.from_numpy(initial)#.transpose(0, 1)
+        # print("inputs shape", inputs_torch.shape)
+        # inputs_repeated = inputs_torch.repeat(3600, 1).requires_grad_(True)
+        # print("inputs shape", inputs_repeated.shape)
+        # grad_output = torch.eye(7200).to(device, dtype=torch.float)
+        # print("ATTE", grad_output.type())
+        # decoder = torch.jit.load("./decoder_gpu_4.pt")
+        # output1 = model.decoder(inputs_repeated.to(device, dtype=torch.float))
+        # output = decoder(inputs_repeated.to(device, dtype=torch.float))
+        print("saved")
 
     loss_list = []
     val_list = []
@@ -123,19 +137,27 @@ def main(args):
     best = 1000
     start_epoch = 1
     it = 0
+    loss_val = 1
 
     # Train the model
     start = time.time()
+    burning = True
     try:
         for epoch in range(start_epoch, NUM_EPOCHS):
             epoch_loss = 0
+
+            if loss_val < 0.006 and burning:
+                print("CHANGED TO SGD")
+                optimizer = torch.optim.SGD(model.parameters(), lr=0.0001)
+                burning = False
+
             for snap in train_loader:
 
                 snap = snap.to(device, dtype=torch.float)
                 outputs = model(snap)
                 loss = criterion(
                     nor.frame2d(outputs), nor.rescale(snap, device)
-                )  + torch.norm(nor.frame2d(outputs)-nor.rescale(snap, device), p=ORDER)
+                ) + regularizerl1(model, device, factor=0.00001)# + regularizerl2(model, device, factor=0.0005)#+ torch.norm(nor.frame2d(outputs)-nor.rescale(snap, device), p=ORDER)
 
                 # Backward and optimize
                 optimizer.zero_grad()
@@ -148,7 +170,7 @@ def main(args):
             loss_list.append(mean_epoch_loss)
 
             # validation loss evaluation
-            val_cuda = val_torch[:].to("cuda", dtype=torch.float)
+            val_cuda = val_torch[:].to(device, dtype=torch.float)
             outputs_val = model(val_cuda).detach().cpu().numpy()
             del val_cuda
             diff = np.abs(nor.frame2d(outputs_val) - nor.rescale(val_np))
@@ -157,7 +179,7 @@ def main(args):
             val_list.append(loss_val)
 
             # test error evaluation
-            snap_true_cuda = snap_true_torch[:].to("cuda", dtype=torch.float)
+            snap_true_cuda = snap_true_torch[:].to(device, dtype=torch.float)
             snap_true_rec = nor.frame2d(
                 model(snap_true_cuda)).detach().cpu().numpy()
             del snap_true_cuda
@@ -186,10 +208,10 @@ def main(args):
             # plt.ion()
             if epoch % args.iter == 0:
                 print(
-                    'Epoch [{}/{}], Time: {:.2f} s, Loss: {:.10f}\n Validation, Loss: {:.6f}, Test, Loss: {:.6f}, {:.6f}, {:.6f}, max {:.6f}'
+                    'Epoch [{}/{}], Time: {:.2f} s, Loss: {:.10f}\n Validation, Loss: {:.6f}, Test, Loss: {:.6f}, {:.6f}, {:.6f}, max {:.6f}\n'
                     .format(epoch, NUM_EPOCHS,
                             time.time() - start, mean_epoch_loss, loss_val,
-                            error_mean, error_max, error_min, error_max_mean))
+                            error_mean, error_max, error_min, error_max_mean), "regularizers l1 l2: ", regularizerl1(model, device, factor=0.0001).item(),  regularizerl2(model, device, factor=0.01).item())
 
                 start = time.time()
 
@@ -210,7 +232,7 @@ def main(args):
                 else:
                     is_best=False
                     it += 1
-                    if it > 5:
+                    if it > 8 and epoch> 5:
                         optimizer.param_groups[0]['lr'] *= 0.5
                         print("LR CHANGED")
                         it = 0
@@ -342,6 +364,11 @@ if __name__ == '__main__':
                         default='False',
                         type=str,
                         help='whether to load the model')
+    parser.add_argument('-save',
+                        '--save',
+                        default='False',
+                        type=str,
+                        help='whether to save the model')
     parser.add_argument('-i',
                         '--iter',
                         default=2,

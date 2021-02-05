@@ -210,28 +210,47 @@ int newton_nmlspg_burgers::operator()(const Eigen::VectorXd &x, Eigen::VectorXd 
     auto g = embedding->forward(x.head(Nphi_u), mu);
     volVectorField& a_tmp = g();
     fvMesh& mesh = problem->_mesh();
-    auto phi = linearInterpolate(a_tmp) & mesh.Sf();
 
     auto a_old = g_old();
     volVectorField& tmp = a_tmp.oldTime();
     tmp = a_old;
 
+    auto phi = linearInterpolate(a_tmp) & mesh.Sf();
+
     fvVectorMatrix resEqn(
         fvm::ddt(a_tmp) + 0.5 * fvm::div(phi, a_tmp) - fvm::laplacian(dimensionedScalar(dimViscosity, nu.value()), a_tmp));
 
-    resEqn.solve();
+    // resEqn.solve();
     a_tmp.field() = resEqn.residual();
+
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_true.C, line 225 #################### " << endl;
+    // Eigen::MatrixXd matrix;
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_true.C, line 227 #################### " << endl;
+    // fvVectorMatrix mass(fvm::ddt(a_tmp));
+    // Foam2Eigen::fvMatrix2EigenM(mass, matrix);
+    // cnpy::save(matrix, "mass.npy");
+
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_true.C, line 228 #################### " << endl;
+    // fvVectorMatrix diverg(0.5 * fvm::div(phi, a_tmp));
+    // Foam2Eigen::fvMatrix2EigenM(diverg, matrix);
+    // cnpy::save(matrix, "div.npy");
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_true.C, line 230 #################### " << endl;
+    // fvVectorMatrix diff(fvm::laplacian(dimensionedScalar(dimViscosity, nu.value()), a_tmp));
+
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_true.C, line 230 #################### " << endl;
+    // Foam2Eigen::fvMatrix2EigenM(diff, matrix);
+    // cnpy::save(matrix, "diff.npy");
 
     fvec = Foam2Eigen::field2Eigen(a_tmp).col(0).head(this->embedding->output_dim * 2);
 
-    // this->embedding->save_field.append(a_tmp);
+    // // this->embedding->save_field.append(a_tmp);
 
-    // if (this->embedding->counter == 2000) {
-    //     std::cout << "SAVED" << std::endl;
-    //     ITHACAstream::exportFields(this->embedding->save_field, "./RESIDUAL", "g");
-    // }
+    // // if (this->embedding->counter == 2000) {
+    // //     std::cout << "SAVED" << std::endl;
+    // //     ITHACAstream::exportFields(this->embedding->save_field, "./RESIDUAL", "g");
+    // // }
 
-    // this->embedding->counter++;
+    // // this->embedding->counter++;
 
     Info << " residual norm: " << fvec.norm() << endl;
 

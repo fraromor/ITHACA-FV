@@ -424,7 +424,7 @@ void nonlinear_one_parameter_initial_velocity(tutorial00 test_FOM)
     int NmodesUout = para->ITHACAdict->lookupOrDefault<int>("NmodesUout", 15);
     int NmodesUproj = para->ITHACAdict->lookupOrDefault<int>("NmodesUproj", 10);
     int NmodesUtest = para->ITHACAdict->lookupOrDefault<int>("NmodesUtest", 100);
-    int NnonlinearModes = para->ITHACAdict->lookupOrDefault<int>("NnonlinearModes", 4);
+    int NnonlinearModes = 4;//para->ITHACAdict->lookupOrDefault<int>("NnonlinearModes", 4);
 
     /// Set the number of parameters
     test_FOM.Pnumber = 1;
