@@ -5,8 +5,8 @@ plt.rcParams.update({'font.size': 16})
 # ROM intrusive errors
 error_L2_intrusive = np.load("./ITHACAoutput/ErrorsL2/errL2UIntrusive.npy")
 error_L2_intrusive_NMLSPGCentral = np.load("./ITHACAoutput/ErrorsL2/errL2UNMLSPGCentral.npy")
-error_L2_intrusive_NMLSPGTrue = np.load("./ITHACAoutput/ErrorsL2/errL2UNMLSPGTrue.npy")
-error_consistency = np.load("./ITHACAoutput/ErrorsL2/errConsistency.npy")
+# error_L2_intrusive_NMLSPGTrue = np.load("./ITHACAoutput/ErrorsL2/errL2UNMLSPGTrue.npy")
+# error_consistency = np.load("./ITHACAoutput/ErrorsL2/errConsistency.npy")
 # non intrusive errors
 error_L2_nonintrusive= np.load("./ITHACAoutput/ErrorsL2/errL2UnonIntrusive.npy")
 error_L2_nonintrusive_covae = np.load("./Autoencoders/ConvolutionalAe/errL2UconvAeNonIntrusive.npy")
@@ -24,7 +24,7 @@ plt.semilogy(np.arange(error_L2_CAE_projection.shape[0])[1:]/1000, error_L2_ROM_
 plt.semilogy(np.arange(error_L2_CAE_projection.shape[0])[1:]/1000, error_L2_intrusive_NMLSPGCentral[1:], label="NM-LSPG-Central",  linewidth=2)
 
 # plt.semilogy(np.arange(error_L2_CAE_projection.shape[0])[1:]/1000, error_L2_intrusive_NMLSPGTrue[1:], label="NM-LSPG-TrueJacobian",  linewidth=2)
-plt.semilogy(np.arange(error_consistency.shape[0])[1:]/1000, error_consistency[1:], label="non-intrus-cae-lstm consistency",  linewidth=2)
+# plt.semilogy(np.arange(error_consistency.shape[0])[1:]/1000, error_consistency[1:], label="non-intrus-cae-lstm consistency",  linewidth=2)
 
 plt.legend()
 plt.ylim([1e-4,1e-0])

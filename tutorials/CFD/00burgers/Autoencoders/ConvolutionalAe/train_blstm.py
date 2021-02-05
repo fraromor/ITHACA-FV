@@ -48,30 +48,30 @@ def main(args):
     model.eval()
 
     # plot initial
-    # inputs = torch.from_numpy(np.load("latent_initial_"+str(args.latent_dim)+".npy")).to(device, dtype=torch.float)
-    # output = model.decoder.forward(inputs)
-    # print("latent initial:", inputs)
-    # print("shapeoutput", output, np.max(output.detach().numpy()))
-    # plot_snapshot(output.detach().cpu().numpy().reshape(1, 2, 60, 60), 0, idx_coord=0)
+    inputs = torch.from_numpy(np.load("latent_initial_4.npy")).to(device, dtype=torch.float)
+    output = model.decoder.forward(inputs)
+    print("latent initial:", inputs)
+    print("shapeoutput", output, np.max(output.detach().numpy()))
+    plot_snapshot(output.detach().cpu().numpy().reshape(1, 2, 60, 60), 0, idx_coord=0)
 
-    # A = nor.frame2d(output.detach().cpu().numpy())[0, 1, :, :] > 0
-    # plt.spy(A)
-    # plt.show()
+    A = nor.frame2d(output.detach().cpu().numpy())[0, 1, :, :] > 0
+    plt.spy(A)
+    plt.show()
 
-    # # reconstruct snapshots
-    # snap_rec = model(snap_torch).cpu().detach().numpy()
-    # print("non linear reduction training coeffs: ", snap_rec.shape)
-    # # plot_compare(snap_framed, nor.frame2d(snap_rec), n_train)
+    # reconstruct snapshots
+    snap_rec = model(snap_torch).cpu().detach().numpy()
+    print("non linear reduction training coeffs: ", snap_rec.shape)
+    # plot_compare(snap_framed, nor.frame2d(snap_rec), n_train)
 
-    # A = nor.frame2d(snap_rec)[0, 1, :, :] > 0
-    # plt.spy(A)
-    # plt.show()
+    A = nor.frame2d(snap_rec)[0, 1, :, :] > 0
+    plt.spy(A)
+    plt.show()
 
-    # # evaluate hidden variables
-    # nl_red_coeff = model.encoder.forward(snap_torch)
-    # print("non linear reduction training coeffs: ", nl_red_coeff.size())
-    # nl_red_coeff = nl_red_coeff.cpu().detach().numpy()
-    # print("max, min : ", np.max(nl_red_coeff), np.min(nl_red_coeff))
+    # evaluate hidden variables
+    nl_red_coeff = model.encoder.forward(snap_torch)
+    print("non linear reduction training coeffs: ", nl_red_coeff.size())
+    nl_red_coeff = nl_red_coeff.cpu().detach().numpy()
+    print("max, min : ", np.max(nl_red_coeff), np.min(nl_red_coeff))
 
     # test max error
     err = nor.frame2d(snap_rec)-snap_framed
@@ -113,11 +113,10 @@ def main(args):
 
     # LSTM
     input_dim = x.shape[1]
-    hidden_dim = HIDDEN_DIM
-    print("HIDDEN DIM: ", hidden_dim)
+    hidden_dim = output.shape[1]
     n_layers = 2
     n_train = 10000
-    model = ReducedCoeffsTimeSeries(output_dim=HIDDEN_DIM).to(device)
+    model = ReducedCoeffsTimeSeries().to(device)
 
     # dataloader
     x = torch.from_numpy(x.reshape(n_train_params, n_time_samples, x.shape[1]))
@@ -139,7 +138,6 @@ def main(args):
     for epoch in range(1, args.num_epochs):
         inputs = x[:].to(device, dtype=torch.float)
         forwarded = model(inputs)
-
         loss = criterion(forwarded.reshape(-1),
                         output.reshape(-1).to(device, dtype=torch.float))
         loss_list.append(loss.item())

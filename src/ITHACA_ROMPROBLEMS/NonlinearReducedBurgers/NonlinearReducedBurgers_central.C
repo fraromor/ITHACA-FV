@@ -82,7 +82,7 @@ Embedding::Embedding(int dim, fileName decoder_path, volVectorField &U0, Eigen::
     // the tensor inputs of the decoder must be of type at::kFloat (not double)
     input.push_back(latent_initial_tensor.to(at::kFloat).to(torch::kCUDA));
 
-    std::cout << "LATENT INITIAL" << latent_initial_tensor << std::endl;
+    std::cout << "LATENT INITIAL\n" << latent_initial_tensor << std::endl;
 
     torch::Tensor tensor = decoder->forward(std::move(input)).toTensor().to(torch::kCPU);
 
@@ -135,7 +135,11 @@ autoPtr<volVectorField> Embedding::forward(const Eigen::VectorXd &x, const scala
     g.ref() += embedding_ref(mu).ref();
 
     // save_field.append(g());
-    // ITHACAstream::exportFields(save_field, "./R", "g"+std::to_string(counter));
+    // if (counter == 10) {
+    //     std::cout << "SAVED" << std::endl;
+    //     ITHACAstream::exportFields(save_field, "./Forwarded","g");
+    // }
+
     return g;
 }
 
@@ -205,16 +209,18 @@ std::pair<autoPtr<volVectorField>, autoPtr<Eigen::MatrixXd>> Embedding::forward_
 // Operator to evaluate the residual
 int newton_nmlspg_burgers::operator()(const Eigen::VectorXd &x, Eigen::VectorXd &fvec) const
 {
-    Info << " residual, x = " << x(0) << " " << x(1) << " " << x(2) << " " << x(3) << endl;
+    std::cout << " residual, x = " << x.transpose() << endl;
 
     auto g = embedding->forward(x.head(Nphi_u), mu);
     volVectorField& a_tmp = g();
     fvMesh& mesh = problem->_mesh();
-    auto phi = linearInterpolate(a_tmp) & mesh.Sf();
+
 
     auto a_old = g_old();
     volVectorField& tmp = a_tmp.oldTime();
     tmp = a_old;
+
+    auto phi = linearInterpolate(a_tmp) & mesh.Sf();
 
     fvVectorMatrix resEqn(
         fvm::ddt(a_tmp) + 0.5 * fvm::div(phi, a_tmp) - fvm::laplacian(dimensionedScalar(dimViscosity, nu.value()), a_tmp));
@@ -226,9 +232,9 @@ int newton_nmlspg_burgers::operator()(const Eigen::VectorXd &x, Eigen::VectorXd 
 
     // this->embedding->save_field.append(a_tmp);
 
-    // if (this->embedding->counter == 2000) {
+    // if (this->embedding->counter == 10) {
     //     std::cout << "SAVED" << std::endl;
-    //     ITHACAstream::exportFields(this->embedding->save_field, "./RESIDUAL", "g");
+    //     ITHACAstream::exportFields(this->embedding->save_field, "./RESIDUAL", "res");
     // }
 
     // this->embedding->counter++;

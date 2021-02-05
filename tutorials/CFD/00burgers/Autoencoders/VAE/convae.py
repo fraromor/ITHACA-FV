@@ -384,12 +384,12 @@ class DeepDeepDecoder(nn.Module):
             # nn.BatchNorm2d(16),
              nn.ELU())
         self.layer3 = nn.Sequential(
-            nn.ConvTranspose2d(16, 8, kernel_size=4, stride=2, padding=0),
+            nn.ConvTranspose2d(16, 2, kernel_size=6, stride=2, padding=1),
             # nn.BatchNorm2d(8),
              nn.ELU())
         self.layer4 = nn.Sequential(
-            # nn.UpsamplingBilinear2d(scale_factor=2),
-            nn.ConvTranspose2d(8, 2, kernel_size=4, stride=2, padding=1),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+            # nn.ConvTranspose2d(8, 2, kernel_size=4, stride=2, padding=0),
             # nn.BatchNorm2d(2),
         )
 

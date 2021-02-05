@@ -9,7 +9,7 @@ from lstm import *
 from convae import *
 
 WM_PROJECT = "../../"
-HIDDEN_DIM = 4
+HIDDEN_DIM = 8
 DOMAIN_SIZE = 60
 DIM = 2
 device = torch.device('cuda:0')
@@ -40,10 +40,10 @@ model = AE(
         domain_size=DOMAIN_SIZE,
         use_cuda=True).to(device)
 
-modello = torch.load("./model_4.ckpt")
-model.load_state_dict(modello['state_dict'])
-# model.load_state_dict(torch.load("./model_"+str(HIDDEN_DIM)+".ckpt"))
-# model.eval()
+# modello = torch.load("./model_4.ckpt")
+# model.load_state_dict(modello['state_dict'])
+model.load_state_dict(torch.load("./model_"+str(HIDDEN_DIM)+".ckpt"))
+model.eval()
 
 ##################################### TEST LSTM
 
@@ -76,7 +76,7 @@ x_test = np.hstack((x_test_0, x_test_1))
 print("test dataset shape: ", x_test.shape)
 
 # load lstm
-lstm_model = ReducedCoeffsTimeSeries().to(device)
+lstm_model = ReducedCoeffsTimeSeries(output_dim=HIDDEN_DIM).to(device)
 lstm_model.load_state_dict(torch.load('lstm_'+str(HIDDEN_DIM)+'.ckpt'))
 lstm_model.eval()
 
