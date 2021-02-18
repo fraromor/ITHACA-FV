@@ -228,7 +228,7 @@ class DeepEncoder(nn.Module):
 
 class DeepDeepEncoder(nn.Module):
     def __init__(self, hidden_dim, domain_size):
-        super().__init__()
+        super(DeepDeepEncoder, self).__init__()
         self.ds = domain_size
         self.hl = 3
         # print(self.hl)
@@ -238,7 +238,7 @@ class DeepDeepEncoder(nn.Module):
              nn.ELU())
         self.layer2 = nn.Sequential(
             nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=1),
-            # nn.BatchNorm2d16),
+            # nn.BatchNorm2d(16),
              nn.ELU())
         self.layer3 = nn.Sequential(
             nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
@@ -246,65 +246,13 @@ class DeepDeepEncoder(nn.Module):
              nn.ELU())
         self.layer4 = nn.Sequential(
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
-            # nn.BatchNorm2d(32),
+            # nn.BatchNorm2d(64),
              nn.ELU())
         self.layer5 = nn.Sequential(
             nn.Conv2d(64, 128, kernel_size=2, stride=2, padding=1),
-            # nn.BatchNorm2d(64),
-             nn.ELU())
-        self.fc = nn.Sequential(nn.Linear(128 * 3**2, hidden_dim))  #, Swish())
-
-    def forward(self, x):
-        out = self.layer1(x)
-        # print(out.size())
-        out = self.layer2(out)
-        # print(out.size())
-        out = self.layer3(out)
-        # print(out.size())
-        out = self.layer4(out)
-        # print(out.size())
-        out = self.layer5(out)
-        # print(out.size())
-        out = out.reshape(out.size(0), -1)
-        out = self.fc(out)
-        # print(out.size())
-        return out
-
-    def eval_size(self):
-        convlayer = lambda x: np.floor((x - 5 + 2) / 2 + 1)
-        lastconvlayer = lambda x: np.floor((x - 4 + 2) / 2 + 1)
-        # print(convlayer(self.ds))
-        # print(convlayer(convlayer(self.ds)))
-        # print(convlayer(convlayer(convlayer(self.ds))))
-        return lastconvlayer(convlayer(convlayer(convlayer(self.ds))))
-
-class DeepDeepEncoder2(nn.Module):
-    def __init__(self, hidden_dim, domain_size):
-        super().__init__()
-        self.ds = domain_size
-        self.hl = 3
-        # print(self.hl)
-        self.layer1 = nn.Sequential(
-            nn.Conv2d(2, 16, kernel_size=5, stride=2, padding=0),
-            # nn.BatchNorm2d(16),
-             nn.ELU())
-        self.layer2 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
-            # nn.BatchNorm2d32),
-             nn.ELU())
-        self.layer3 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
-            # nn.BatchNorm2d(32),
-             nn.ELU())
-        self.layer4 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
-            # nn.BatchNorm2d(64),
-             nn.ELU())
-        self.layer5 = nn.Sequential(
-            nn.Conv2d(128, 256, kernel_size=2, stride=2, padding=1),
             # nn.BatchNorm2d(128),
              nn.ELU())
-        self.fc = nn.Sequential(nn.Linear(256 * 3**2, hidden_dim))  #, Swish())
+        self.fc = nn.Sequential(nn.Linear(128 * 3**2, hidden_dim))  #, Swish())
 
     def forward(self, x):
         out = self.layer1(x)
@@ -427,59 +375,6 @@ class DeepDeepDecoder(nn.Module):
         out = out.reshape(-1, self.ds * self.ds * 2)
         return torch.nn.functional.relu(out)  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
 
-class DeepDeepDecoder2(nn.Module):
-    def __init__(self, hidden_dim, domain_size, hidden_length, scale, mean):
-        super().__init__()
-        self.ds = domain_size
-        self.hl = 3
-        self.scale = scale
-        self.mean = mean
-
-        self.fc = nn.Sequential(nn.Linear(hidden_dim, 256 * (self.hl)**2),
-                                nn.ELU())
-        self.layer0 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(256, 128, kernel_size=2, stride=1, padding=0),
-             nn.ELU())
-        self.layer1 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(128, 64, kernel_size=4, stride=1, padding=0),
-             nn.ELU())
-        self.layer2 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),
-             nn.ELU())
-        self.layer3 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(32, 16, kernel_size=3, stride=1, padding=2),
-             nn.ELU())
-        self.layer4 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(16, 2, kernel_size=3, stride=1, padding=1),
-        )
-
-    # @clock.clock
-    def forward(self, z):
-        # print("LATENT", z.shape, z)
-        out = self.fc(z)
-        out = out.reshape(-1, 256, self.hl, self.hl)
-        # print(out.size())
-        out = self.layer0(out)
-        # print(out.size())
-        out = self.layer1(out)
-        # print(out.size())
-        out = self.layer2(out)
-        # print(out.size())
-        out = self.layer3(out)
-        # print(out.size())
-        out = self.layer4(out)
-        # out = 2 * (out + self.mean - 0.5*(self.scale[1] + self.scale[0])) / ( self.scale[1] - self.scale[0])
-
-        out = out * 0.5 * (self.scale[1] - self.scale[0])
-        out = out + 0.5 * (self.scale[1] + self.scale[0])
-        out = out + self.mean
-        out = out.reshape(-1, self.ds * self.ds * 2)
-        return torch.nn.functional.relu(out)  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
 
 class ShallowDecoder(nn.Module):
     def __init__(self, hidden_dim, domain_size, hidden_length, scale):
@@ -527,8 +422,8 @@ class Normalize(object):
         snap_tmp = self.framesnap(snap)
 
         if self._center_fl:
-            self._mean = np.mean(snap_tmp, axis=0, keepdims=True)
-            # self._mean = snap_tmp[:1, :, :, :]
+            # self._mean = np.mean(snap_tmp, axis=0, keepdims=True)
+            self._mean = snap_tmp[:1, :, :, :]
             # plot_snapshot(self._mean, 0, title="mean")
 
         if self._scale_fl:

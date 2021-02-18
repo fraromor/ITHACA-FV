@@ -41,7 +41,7 @@ License
 #include "cnpy.H"
 
 
-#include "NonlinearReducedBurgers_true.H"
+#include "NonlinearReducedBurgers_central.H"
 
 using namespace ITHACAtorch;
 // * * * * * * * * * * * * * * * Constructors * * * * * * * * * * * * * * * * //
@@ -82,7 +82,7 @@ Embedding::Embedding(int dim, fileName decoder_path, volVectorField &U0, Eigen::
     // the tensor inputs of the decoder must be of type at::kFloat (not double)
     input.push_back(latent_initial_tensor.to(at::kFloat).to(torch::kCUDA));
 
-    std::cout << "LATENT INITIAL\n" << latent_initial_tensor << std::endl;
+    std::cout << "LATENT INITIAL" << latent_initial_tensor << std::endl;
 
     torch::Tensor tensor = decoder->forward(std::move(input)).toTensor().to(torch::kCPU);
 
@@ -94,8 +94,7 @@ Embedding::Embedding(int dim, fileName decoder_path, volVectorField &U0, Eigen::
 
     auto g0 = torch2Foam::torch2Field<vector>(tensor_stacked);
     _g0.ref().ref().field() = std::move(g0);
-
-    // save_field.append(_g0());
+    // save_field.append(_g0.clone();
     // ITHACAstream::exportFields(save_field, "./REF", "g0");
 }
 
@@ -107,6 +106,7 @@ autoPtr<volVectorField> Embedding::embedding_ref(const scalar mu)
 
 autoPtr<volVectorField> Embedding::forward(const Eigen::VectorXd &x, const scalar mu)
 {
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 109 #################### " << endl;
     // declare input of decoder of type IValue since the decoder is loaded from pytorch
     std::vector<torch::jit::IValue> input;
     Eigen::MatrixXd input_matrix{x};
@@ -115,26 +115,26 @@ autoPtr<volVectorField> Embedding::forward(const Eigen::VectorXd &x, const scala
     torch::Tensor input_tensor = torch2Eigen::eigenMatrix2torchTensor(std::move(input_matrix));
     input_tensor = input_tensor.reshape({1, latent_dim});
     input_tensor = input_tensor.set_requires_grad(true);
-
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 118 #################### " << endl;
     // the tensor inputs of the decoder must be of type at::kFloat (not double)
     input.push_back(input_tensor.to(at::kFloat).to(torch::kCUDA));
 
     torch::Tensor push_forward_tensor = decoder->forward(std::move(input)).toTensor().to(torch::kCPU);
-
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 123 #################### " << endl;
     auto g = autoPtr<volVectorField>(new volVectorField(_U0()));
 
     // add the z component to the tensor as a zero {1, 60, 60} tensor and
     // reshape the tensor s.t. the components x,y,z of a single cell center are
     // contiguous in memory (this is necessary for torch2field method)
     auto tensor_stacked = torch::cat({push_forward_tensor.reshape({2, 60, 60}), torch::zeros({1, 60, 60})}, 0).reshape({3, -1}).transpose(0, 1).contiguous();
-
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 130 #################### " << endl;
     auto push_forward = torch2Foam::torch2Field<vector>(tensor_stacked);
 
     // add reference term
     g.ref().ref().field() = std::move(push_forward);
     g.ref() += embedding_ref(mu).ref();
-
-    // save_field.append(g());
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 136 #################### " << endl;
+    // save_field.append(g().clone());
     // if (counter == 10) {
     //     std::cout << "SAVED" << std::endl;
     //     ITHACAstream::exportFields(save_field, "./Forwarded","g");
@@ -230,7 +230,7 @@ int newton_nmlspg_burgers::operator()(const Eigen::VectorXd &x, Eigen::VectorXd 
 
     fvec = Foam2Eigen::field2Eigen(a_tmp).col(0).head(this->embedding->output_dim * 2);
 
-    // this->embedding->save_field.append(a_tmp);
+    // this->embedding->save_field.append(a_tmp.clone());
 
     // if (this->embedding->counter == 10) {
     //     std::cout << "SAVED" << std::endl;
@@ -244,40 +244,6 @@ int newton_nmlspg_burgers::operator()(const Eigen::VectorXd &x, Eigen::VectorXd 
     return 0;
 }
 
-// int newton_nmlspg_burgers::df(const Eigen::VectorXd &x,
-//                               Eigen::MatrixXd &fjac) const
-// {
-//     // cnpy::save(x,/*  */ "x.npy");
-//     auto pair = embedding->forward_with_gradient(x.head(Nphi_u), mu);
-//     volVectorField &a_tmp = pair.first();
-//     Eigen::MatrixXd a_grad = pair.second();
-
-//     fvMesh &mesh = problem->_mesh();
-//     auto phi = linearInterpolate(a_tmp) & mesh.Sf();
-
-//     auto a_old = g_old();
-//     volVectorField& tmp = a_tmp.oldTime();
-//     tmp = a_old;
-
-//     fvVectorMatrix resEqn(
-//         fvm::ddt(a_tmp) + 0.5 * fvm::div(phi(), a_tmp) - fvm::laplacian(dimensionedScalar(dimViscosity, nu.value()), a_tmp));
-
-//     Eigen::SparseMatrix<double> dres;
-//     Foam2Eigen::fvMatrix2EigenM<Foam::Vector<double>, decltype(dres)>(resEqn, dres);
-
-//     fjac = (-1) * dres.block(0, 0, this->embedding->output_dim * 2,
-//     this->embedding->output_dim * 2) * a_grad;
-
-//     // cnpy::save(fjac, "jacobian.npy");
-//     // cnpy::save(Eigen::MatrixXd(dres), "system_df.npy");
-//     // cnpy::save(a_grad, "torch_grad.npy");
-
-//     // Eigen::NumericalDiff<newton_nmlspg_burgers, Eigen::Central> numDiff5(*this, 1.e-05);
-//     // numDiff5.df(x, fjac);
-//     // cnpy::save(fjac, "fjac_central_5.npy");
-//     return 0;
-// }
-
 // * * * * * * * * * * * * * * * Solve Functions  * * * * * * * * * * * * * //
 void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
 {
@@ -286,14 +252,21 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
              "The time step dt must be smaller than exportEvery.");
     M_Assert(storeEvery >= dt,
              "The time step dt must be smaller than storeEvery.");
+    // M_Assert(exportResidual >= dt,
+    //          "The time step dt must be smaller than exportEvery.");
     M_Assert(ITHACAutilities::isInteger(storeEvery / dt) == true,
              "The variable storeEvery must be an integer multiple of the time step dt.");
     M_Assert(ITHACAutilities::isInteger(exportEvery / dt) == true,
              "The variable exportEvery must be an integer multiple of the time step dt.");
+    M_Assert(ITHACAutilities::isInteger(exportResidual / dt) == true,
+             "The variable storeEvery must be an integer multiple of the time step dt.");
     M_Assert(ITHACAutilities::isInteger(exportEvery / storeEvery) == true,
              "The variable exportEvery must be an integer multiple of the variable storeEvery.");
-
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 264 #################### " << endl;
     int numberOfStores = round(storeEvery / dt);
+
+    // numberOfResiduals defaults to 0 and in that case no residual is saved
+    int numberOfResiduals = round(exportResidual / dt);
 
     // Counter of the number of online solutions saved, accounting also time as parameter
     int counter2 = 0;
@@ -305,10 +278,11 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
     // resize the online solution list with the length of n_parameters times
     // length of the time series
     online_solution.resize((mu.cols()) * (onlineSizeTimeSeries));
-
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 280 #################### " << endl;
     // Iterate online solution for each parameter saved row-wise in mu
     for (int n_param = 0; n_param < mu.cols(); n_param++)
     {
+
         // Set the initial time
         time = tstart;
 
@@ -316,32 +290,39 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
         int counter = 0;
         int nextStore = 0;
 
+        // residual export for hyper-reduction counter
+        int counterResidual = 1;
+        // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 294 #################### " << endl;
         // Create and resize the solution vector (column vector)
         y.resize(Nphi_u, 1);
         y = embedding->latent_initial.transpose();
         newton_object.g_old = embedding->forward(y, mu(0, n_param));
-
+        // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 300 #################### " << endl;
         auto tmp = newton_object.g_old();
-        uRecFields.append(tmp);
-
+        // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 302 #################### " << endl;
+        uRecFields.append(tmp.clone());
+        // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 303 #################### " << endl;
         // Set some properties of the newton object
         newton_object.mu = mu(0, n_param);
         newton_object.nu = nu;
         newton_object.dt = dt;
         newton_object.tauU = tauU;
 
-        // Create vector to store temporal solution and save initial condition as first solution
+        // Create vector to store temporal solution and save initial condition
+        // as first solution
+        // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 313 #################### " << endl;
         Eigen::MatrixXd tmp_sol(Nphi_u + 1, 1);
         tmp_sol(0) = time;
+        // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 316 #################### " << endl;
         tmp_sol.col(0).tail(y.rows()) = y;
-
+        // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 318 #################### " << endl;
         online_solution[counter2] = tmp_sol;
         counter2++;
         counter++;
         nextStore += numberOfStores;
 
         // Create nonlinear solver object
-
+        // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers/NonlinearReducedBurgers_central.C, line 321 #################### " << endl;
         // Create nonlinear solver object
         Eigen::NumericalDiff<newton_nmlspg_burgers, Eigen::Central> numDiffobject(newton_object, 1.e-05);
         Eigen::LevenbergMarquardt<decltype(numDiffobject)> lm(numDiffobject);
@@ -371,11 +352,11 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
             Eigen::VectorXd res(2 * numDiffobject.embedding->output_dim);
             res.setZero();
 
-            // update the old solution for the evaluation of the residual and jacobian
+            // update the old solution for the evaluation of the residual
             numDiffobject(y, res);
             numDiffobject.g_old = embedding->forward(y, mu(0, n_param));
             auto tmp = numDiffobject.g_old();
-            uRecFields.append(tmp);
+            uRecFields.append(tmp.clone());
 
             std::cout << "################## Online solve N° " << counter << " ##################" << std::endl;
             Info << "Time = " << time << endl;
@@ -407,6 +388,24 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
 
                 nextStore += numberOfStores;
                 counter2++;
+            }
+
+            if (numberOfResiduals > 0)
+            {
+                if (counterResidual == numberOfResiduals)
+                {
+                    volScalarField res_to_be_saved = numDiffobject.g_old().component(0);
+
+                    // Eigen::VectorXd zeros = Eigen::VectorXd::Zero(numDiffobject.embedding->output_dim);
+                    // Eigen::VectorXd res_extended(res.size() + zeros.size());
+                    // res_extended << res, zeros;
+                    Eigen::VectorXd res_component = res.head(this->embedding->output_dim);
+                    res_to_be_saved = Foam2Eigen::Eigen2field(res_to_be_saved, res_component);
+                    residualsList.append(res_to_be_saved);
+                    counterResidual = 1;
+                }
+
+                counterResidual++;
             }
 
             counter++;
