@@ -28,6 +28,7 @@ EXE_INC = \
     -I$(LIB_ITHACA_SRC)/ITHACA_ROMPROBLEMS/NonLinearSolvers \
     -I$(LIB_ITHACA_SRC)/ITHACA_ROMPROBLEMS/ReducedBurgers \
     -I$(LIB_ITHACA_SRC)/ITHACA_ROMPROBLEMS/NonlinearReducedBurgers \
+    -I$(LIB_ITHACA_SRC)/ITHACA_DEIM \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/ITHACAutilities \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/ITHACAPOD \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/ITHACAparallel \
@@ -64,6 +65,7 @@ EXE_LIBS = \
     -lburgersFoam \
     -lburgersReduced \
     -lburgersNonlinearReduced \
+    -lITHACA_DEIM \
     -L$(FOAM_USER_LIBBIN) \
     -lITHACA_TORCH \
     -Wl,-rpath,$(TORCH_LIBRARIES)/lib $(TORCH_LIBRARIES)/lib/libtorch.so $(TORCH_LIBRARIES)/lib/libc10.so \

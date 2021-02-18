@@ -22,6 +22,7 @@ NmodesUout 4;
 NmodesUproj 3;
 NmodesUtest 1;
 NnonlinearModes 4;
+NDEIM 50;
 
 // Output format to save market vectors.
 OutPrecision 20;

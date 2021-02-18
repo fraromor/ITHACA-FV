@@ -209,6 +209,9 @@ public:
     /// Recontructed velocity fields list
     PtrList<volVectorField> uRecFields;
 
+    /// List of pointers to store the snapshots for velocity
+    PtrList<volScalarField> residualsList;
+
     /// Newton object used to solve the non linear problem
     newton_nmlspg_burgers newton_object;
 
@@ -245,6 +248,9 @@ public:
     /// A variable for exporting the fields
     double exportEvery;
 
+    /// A variable for exporting the sList
+    double exportResidual=0;
+
     /// A variable for starting solving the reduced system from zero or not
     bool startFromZero = false;
 
@@ -257,7 +263,7 @@ public:
     /// Maximum number of iterations to be done for the computation of the penalty factor
     scalar maxIterPenalty;
 
-    /// Tolerance for the residual of the boundary values, there is the same tolerance for velocity and temperature
+    /// Tolerance for the sList of the boundary values, there is the same tolerance for velocity and temperature
     scalar tolerancePenalty;
 
     // Functions
