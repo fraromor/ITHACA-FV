@@ -19,6 +19,16 @@ GPU
 Results:  0.0027509403228759767 0.003593730926513672 0.0007230257987976075 0.003582329750061035 0.0007891273498535157 0.003551943302154541
 Results std:  0.02058271404175449 0.00026978082780839226 5.535019764741927e-05 0.00016335241867486484 0.000159090540983393 0.00010243224811197903
 """
+class AEsingleoutput(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        # create the encoder and decoder networks
+        self.model = model
+
+    def forward(self, x):
+        z = self.model(x)[0, 0]
+        return z
+
 class PruningGrads(prune.BasePruningMethod):
     """Prune every other entry in a tensor
     """
@@ -247,10 +257,9 @@ def main(args):
         # for name, item in list(model.named_buffers()):
         #     print(name)
         # print(module._forward_pre_hooks)
-
-        output = model.decoder(torch.ones(1, 4).to(device))
         # print(list(model.named_buffers()))
 
+        output = model.decoder(torch.ones(1, 4).to(device))
         # print("test", model.decoder.layer0[0].weight, model.decoder.layer0[0].weight_orig)
 
         for name, module in model.decoder.named_modules():
@@ -272,12 +281,16 @@ def main(args):
                 prune.remove(module, 'bias')
 
         for param in model.parameters():
+            if param is not None:
+                acc += torch.sum(param != 0.)
             param = param.to_sparse()
-            # print(param)
+            print(param)
 
-        print("total non zero weights: ", acc, "percentage: ", 100*acc/129798)
+        print("total non zero weights: ", acc, "percentage: ", 100*acc/68000)
 
+        # model = AEsingleoutput(model.decoder)
         model.eval()
+
         with torch.no_grad():
             init = time.time()
             output = model.decoder(torch.ones(1, 4).to(device))
