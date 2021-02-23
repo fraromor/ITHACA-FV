@@ -154,81 +154,11 @@ tutorials/CFD/00burgers/NonIntrusive/nonIntrusiveCoeff.npy
 
 tutorials/CFD/00burgers/NonIntrusive/model.ckpt
 
-tutorials/CFD/00burgers/Autoencoders/Shallow/convae.py
+tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/*
 
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/cmake_install.cmake
+tutorials/CFD/00burgers/Autoencoders/VAE/__pycache__/*
 
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeCache.txt
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/3.18.4/CMakeCCompiler.cmake
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/3.18.4/CMakeCXXCompiler.cmake
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/3.18.4/CMakeDetermineCompilerABI_C.bin
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/3.18.4/CMakeDetermineCompilerABI_CXX.bin
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/3.18.4/CMakeSystem.cmake
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/3.18.4/CompilerIdC/a.out
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/3.18.4/CompilerIdC/CMakeCCompilerId.c
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/3.18.4/CompilerIdCXX/a.out
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/3.18.4/CompilerIdCXX/CMakeCXXCompilerId.cpp
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/cmake.check_cache
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/CMakeDirectoryInformation.cmake
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/CMakeError.log
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/CMakeOutput.log
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/Makefile.cmake
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/Makefile2
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/progress.marks
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/Progress/1
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/Progress/count.txt
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/TargetDirectories.txt
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/train.dir/build.make
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/train.dir/cmake_clean.cmake
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/train.dir/CXX.includecache
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/train.dir/depend.internal
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/train.dir/depend.make
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/train.dir/DependInfo.cmake
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/train.dir/flags.make
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/train.dir/link.txt
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/CMakeFiles/train.dir/progress.make
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/detect_cuda_compute_capabilities.cpp
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/detect_cuda_version.cc
-
-tutorials/CFD/00burgers/Autoencoders/VAE/__pycache__/clock.cpython-37.pyc
-
-tutorials/CFD/00burgers/Autoencoders/VAE/__pycache__/vae.cpython-37.pyc
-
-tutorials/CFD/00burgers/Autoencoders/ConvolutionalAe/libtorch/detect_cuda_compute_capabilities.cpp
-
-tutorials/CFD/00burgers/Autoencoders/ConvolutionalAe/libtorch/detect_cuda_version.cc
-
-tutorials/CFD/00burgers/Autoencoders/ConvolutionalAe/libtorch/train
+tutorials/CFD/00burgers/Autoencoders/ConvolutionalAe/libtorch/*
 
 tutorials/CFD/00burgers/Autoencoders/ConvolutionalAe/lstm.ckpt
 
@@ -327,55 +257,7 @@ tutorials/CFD/00burgers/diff.npy
 
 tutorials/CFD/00burgers/div.npy
 
-tutorials/CFD/00burgers/Forwarded/0
-
-tutorials/CFD/00burgers/Forwarded/1/g
-
-tutorials/CFD/00burgers/Forwarded/10/g
-
-tutorials/CFD/00burgers/Forwarded/11/g
-
-tutorials/CFD/00burgers/Forwarded/12/g
-
-tutorials/CFD/00burgers/Forwarded/13/g
-
-tutorials/CFD/00burgers/Forwarded/14/g
-
-tutorials/CFD/00burgers/Forwarded/15/g
-
-tutorials/CFD/00burgers/Forwarded/16/g
-
-tutorials/CFD/00burgers/Forwarded/17/g
-
-tutorials/CFD/00burgers/Forwarded/18/g
-
-tutorials/CFD/00burgers/Forwarded/19/g
-
-tutorials/CFD/00burgers/Forwarded/2/g
-
-tutorials/CFD/00burgers/Forwarded/20/g
-
-tutorials/CFD/00burgers/Forwarded/21/g
-
-tutorials/CFD/00burgers/Forwarded/22/g
-
-tutorials/CFD/00burgers/Forwarded/3/g
-
-tutorials/CFD/00burgers/Forwarded/4/g
-
-tutorials/CFD/00burgers/Forwarded/5/g
-
-tutorials/CFD/00burgers/Forwarded/6/g
-
-tutorials/CFD/00burgers/Forwarded/7/g
-
-tutorials/CFD/00burgers/Forwarded/8/g
-
-tutorials/CFD/00burgers/Forwarded/9/g
-
-tutorials/CFD/00burgers/Forwarded/constant
-
-tutorials/CFD/00burgers/Forwarded/system
+tutorials/CFD/00burgers/Forwarded/*
 
 tutorials/CFD/00burgers/log
 
@@ -389,15 +271,7 @@ tutorials/CFD/00burgers/Autoencoders/ConvolutionalAe/backup_best/model_4.ckpt
 
 tutorials/CFD/00burgers/Autoencoders/Shallow/data/last_model.ckpt
 
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/Makefile
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/net.hpp
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/test.cpp
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/train
-
-tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/train.cpp
+tutorials/CFD/00burgers/Autoencoders/Shallow/libtorch/*
 
 tutorials/CFD/00burgers/Autoencoders/Shallow/lstm.ckpt
 

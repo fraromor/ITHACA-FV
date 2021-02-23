@@ -80,14 +80,14 @@ def main(args):
     # start model
     model = AE(
         HIDDEN_DIM,
-        scale=(nor.min_sn(), nor.max_sn()),
+        scale=(nor.min_sn, nor.max_sn),
         mean=nor.mean(device),
-        domain_size=DOMAIN_SIZE,
-        use_cuda=args.device).to(device)
+        domain_size=DOMAIN_SIZE).to(device)
 
     # summary(model, input_size=(DIM, DOMAIN_SIZE, DOMAIN_SIZE))
-    prune_unstructured(model.decoder.layer2[0], name='weight')
-    print(list(model.named_buffers()))
+    # prune_unstructured(model.decoder.layer2[0], name='weight')
+    # print(list(model.named_buffers()))
+
     # Loss and optimizer
     criterion = nn.MSELoss(reduction='sum')
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
@@ -146,6 +146,7 @@ def main(args):
     # Train the model
     start = time.time()
     burning = True
+    print("Start training")
     try:
         for epoch in range(start_epoch, NUM_EPOCHS):
             epoch_loss = 0

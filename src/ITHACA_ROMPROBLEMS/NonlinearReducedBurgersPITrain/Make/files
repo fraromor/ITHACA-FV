@@ -1,0 +1,3 @@
+NonlinearReducedBurgers_PI.C
+
+LIB = $(FOAM_USER_LIBBIN)/libburgersNonlinearReducedPI

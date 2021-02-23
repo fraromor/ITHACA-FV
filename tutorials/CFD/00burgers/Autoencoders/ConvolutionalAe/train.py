@@ -90,8 +90,8 @@ def main(args):
 
     # load model
     if LOAD is True:
-        # ckp_path = "./checkpoint/check/point.pt"
-        ckp_path = "./model/best_model.pt"
+        ckp_path = "./checkpoint/checkpoint.pt"
+        # ckp_path = "./model/best_model.pt"
         model, _, start_epoch = load_ckp(ckp_path, model)
         optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
         print("loaded")
@@ -153,7 +153,7 @@ def main(args):
 
                 snap = snap.to(device, dtype=torch.float)
                 outputs = model(snap)
-                loss = criterion(nor.frame2d(outputs), nor.rescale(snap, device)) + regularizerl1(model, device, factor=0.000001)# + regularizerl2(model, device, factor=0.0005)#+ torch.norm(nor.frame2d(outputs)-nor.rescale(snap, device), p=ORDER)
+                loss = criterion(nor.frame2d(outputs), nor.rescale(snap, device)) + regularizerl1(model, device, factor=0.0000001)# + regularizerl2(model, device, factor=0.0005)#+ torch.norm(nor.frame2d(outputs)-nor.rescale(snap, device), p=ORDER)
 
                 # Backward and optimize
                 optimizer.zero_grad()
@@ -220,15 +220,15 @@ def main(args):
 
 
                 # save checkpoints
-                if loss_val < best:
+                if mean_epoch_loss < best:
                     is_best = True
-                    best = loss_val
+                    best = mean_epoch_loss
                     it = 0
                     print("BEST CHANGED")
                 else:
                     is_best=False
                     it += 1
-                    if it > 15 and epoch> 5:
+                    if it > 8 and epoch> 5:
                         optimizer.param_groups[0]['lr'] *= 0.5
                         print("LR CHANGED: ", optimizer.param_groups[0]['lr'])
                         it = 0

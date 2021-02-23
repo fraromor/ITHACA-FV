@@ -6,8 +6,10 @@
 cp -r 0.original 0
 blockMesh && checkMesh && setExprFields
 00burgers train
-cd ITHACAoutput/red_coeff/
-python3 red_coeff_mat.py
+sed -i '1iimport numpy as np' ./ITHACAoutput/red_coeff/red_coeff_mat.py
+echo 'np.save("red_coeff_mat.npy", red_coeff)' >> ./ITHACAoutput/red_coeff/red_coeff_mat.py
+python3 ./ITHACAoutput/red_coeff/red_coeff_mat.py
+mv red_coeff_mat.npy ITHACAoutput/red_coeff/
 ~~~
 
 ## Utilities
