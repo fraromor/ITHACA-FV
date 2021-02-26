@@ -45,8 +45,8 @@ def main(args):
     print("snapshots shape", snap_scaled.shape)
     print("Min max after scaling: ", np.min(snap_scaled), np.max(snap_scaled))
     # print(nor.rescale(snaps_torch.to(device), device).detach().cpu().numpy()[2500, 0, 0, 0], nor.rescale(snaps_torch.to(device), device).detach().cpu().numpy()[3000, 0, 0, 59])
-    # plot_snapshot(nor.rescale(snaps_torch.to(device), device).detach().cpu().numpy(), 3000)
-    # plot_snapshot(snaps_torch.detach().cpu().numpy(), 2500)
+    # plot_snapshot(nor.rescale(snaps_torch.to(device), device).detach().cpu().numpy(), 4000)
+    # plot_snapshot(snaps_torch.detach().cpu().numpy(), 4000)
 
     # Test snapshots
     snap_true_vec = np.load(WM_PROJECT + "npTrueSnapshots.npy")
@@ -90,11 +90,10 @@ def main(args):
 
     # load model
     if LOAD is True:
-        ckp_path = "./checkpoint/checkpoint.pt"
-        # ckp_path = "./model/best_model.pt"
+        # ckp_path = "./checkpoint/checkpoint.pt"
+        ckp_path = "./model/best_model.pt"
         model, _, start_epoch = load_ckp(ckp_path, model)
-        optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
-        print("loaded")
+        print("loaded", start_epoch)
 
     if SAVE is True:
         # Save the model checkpoint
@@ -140,6 +139,7 @@ def main(args):
     # Train the model
     start = time.time()
     burning = True
+    factor = 0.00001
     try:
         for epoch in range(start_epoch, NUM_EPOCHS):
             epoch_loss = 0
@@ -153,7 +153,7 @@ def main(args):
 
                 snap = snap.to(device, dtype=torch.float)
                 outputs = model(snap)
-                loss = criterion(nor.frame2d(outputs), nor.rescale(snap, device)) + regularizerl1(model, device, factor=0.0000001)# + regularizerl2(model, device, factor=0.0005)#+ torch.norm(nor.frame2d(outputs)-nor.rescale(snap, device), p=ORDER)
+                loss = criterion(nor.frame2d(outputs), nor.rescale(snap, device)) + regularizerl1(model, device, factor=factor)# + regularizerl2(model, device, factor=0.0005)#+ torch.norm(nor.frame2d(outputs)-nor.rescale(snap, device), p=ORDER)
 
                 # Backward and optimize
                 optimizer.zero_grad()
@@ -207,7 +207,7 @@ def main(args):
                     'Epoch [{}/{}], Time: {:.2f} s, Loss: {:.10f}\n Validation, Loss: {:.6f}, Test, Loss: {:.6f}, {:.6f}, {:.6f}, max {:.6f}\n'
                     .format(epoch, NUM_EPOCHS,
                             time.time() - start, mean_epoch_loss, loss_val,
-                            error_mean, error_max, error_min, error_max_mean), "regularizers l1 l2: ", regularizerl1(model, device, factor=0.0001).item(),  regularizerl2(model, device, factor=0.01).item())
+                            error_mean, error_max, error_min, error_max_mean), "regularizers l1 l2: ", regularizerl1(model, device, factor=factor).item(),  regularizerl2(model, device, factor=factor).item())
 
                 start = time.time()
 
@@ -220,15 +220,15 @@ def main(args):
 
 
                 # save checkpoints
-                if mean_epoch_loss < best:
+                if loss_val < best:
                     is_best = True
-                    best = mean_epoch_loss
+                    best = loss_val
                     it = 0
                     print("BEST CHANGED")
                 else:
                     is_best=False
                     it += 1
-                    if it > 8 and epoch> 5:
+                    if it > 10 and epoch> 5:
                         optimizer.param_groups[0]['lr'] *= 0.5
                         print("LR CHANGED: ", optimizer.param_groups[0]['lr'])
                         it = 0
@@ -325,7 +325,7 @@ def main(args):
             'optimizer': optimizer.state_dict()
         }
         save_ckp(checkpoint, is_best, checkpoint_dir, model_dir)
-
+        print("Saved checkpoint")
 
 if __name__ == '__main__':
     # parse command line arguments

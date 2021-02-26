@@ -37,15 +37,12 @@ SourceFiles
 #ifndef compressibleNS_H
 #define compressibleNS_H
 #include "fvCFD.H"
-#include "singlePhaseTransportModel.H"
-#include "turbulentTransportModel.H"
-#include "pimpleControl.H"
 #include "psiThermo.H"
 #include "turbulentFluidThermoModel.H"
+#include "pimpleControl.H"
 #include "fvOptions.H"
-#include "IOporosityModelList.H"
-#include "IOMRFZoneList.H"
-#include "fixedFluxPressureFvPatchScalarField.H"
+
+#include "IOMRFZoneList.H" // ? necessary
 
 #include "steadyNS.H"
 
@@ -54,13 +51,13 @@ SourceFiles
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 /*---------------------------------------------------------------------------*\
-                        Class SteadyNS Declaration
+                        Class compressibleNS Declaration
 \*---------------------------------------------------------------------------*/
 
 /// Implementation of a parametrized full order <b> compressible NS problem </b> and preparation of the the reduced matrices for the online solve.
 /** In this class are implemented the methods for the offline solve of a compressible NS problem
 and the for the generation of the reduced matrices for subsequent online solve, this class is a son
-of the steadyNS class */
+of the compressibelNS class */
 class compressibleNS: public steadyNS
 {
     public:
@@ -70,6 +67,59 @@ class compressibleNS: public steadyNS
 
         /// Construct with argc and argv
         compressibleNS(int argc, char* argv[]);
+
+        // Dummy variables to transform pimplefoam into a class
+        /// pimpleControl
+        autoPtr<pimpleControl> _pimple;
+
+        /// Turbulence model
+        autoPtr<compressible::turbulenceModel> turbulence;
+
+        /// Thermodynamic properties
+        autoPtr<psiThermo> _thermo;
+
+        /// Energy field
+        autoPtr<volScalarField> _E;
+
+        /// Compressibility field
+        autoPtr<volScalarField> _rho;
+
+        /// Compressibility field
+        autoPtr<volScalarField> _psi;
+
+        /// Kinetic Energy field
+        autoPtr<volScalarField> _K;
+
+
+        /// List of pointers to store initial solutions
+        /// Initial Pressure field (for restart purposes)
+        autoPtr<volScalarField> _p0;
+
+        /// Initial Energy field (for restart purposes)
+        autoPtr<volScalarField> _E0;
+
+        /// Initial Velocity field (for restart purposes)
+        autoPtr<volVectorField> _U0;
+
+        /// Initial Density field (for restart purposes)
+        autoPtr<volScalarField> _rho0;
+
+        /// Initial Flux field (for restart purposes)
+        autoPtr<surfaceScalarField> _phi0;
+
+        /// Initial Compressibility field (for restart purposes)
+        autoPtr<volScalarField> _psi0;
+
+        /// Initial Kinetic Energy field (for restart purposes)
+        autoPtr<volScalarField> _K0;
+
+        /// Member fields
+        /// List of pointers used to form the pressure snapshots matrix
+        PtrList<volScalarField> rhofield;
+
+        /// List of pointers used to form the pressure snapshots matrix
+        PtrList<volScalarField> efield;
+
 
         // Specific variable for the unstationary case
         /// Start Time (initial time to start storing the snapshots)
@@ -86,14 +136,6 @@ class compressibleNS: public steadyNS
 
         /// Auxiliary variable to store the next writing instant
         scalar nextWrite;
-
-        // Dummy variables to transform pimplefoam into a class
-        /// pimpleControl
-        autoPtr<pimpleControl> _pimple;
-
-        /// Turbulence model
-        // TODO
-        autoPtr<incompressible::turbulenceModel> turbulence;
 
         /// adjustTimeStep
         bool adjustTimeStep;
@@ -116,7 +158,6 @@ class compressibleNS: public steadyNS
         // Time derivative numerical scheme order
         word timeDerivativeSchemeOrder;
 
-
         // Functions
 
         //--------------------------------------------------------------------------
@@ -136,6 +177,13 @@ class compressibleNS: public steadyNS
         /// @return     1 if we must write 0 elsewhere.
         ///
         bool checkWrite(Time& timeObject);
+
+        //--------------------------------------------------------------------------
+        /// Function to change the first component of the initial velocity
+        ///
+        /// @param[in]  mu    first component of velocity (scalar)
+        ///
+        void change_initial_velocity(double mu);
 };
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

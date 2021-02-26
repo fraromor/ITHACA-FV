@@ -7,12 +7,14 @@ import matplotlib.pyplot as plt
 import argparse
 from lstm import *
 from convae import *
+import time
 
 def main(args):
     WM_PROJECT = "../../"
     HIDDEN_DIM = args.latent_dim
     DOMAIN_SIZE = 60
     DIM = 2
+    LOAD = eval(args.load)
 
     # Device configuration
     device = torch.device('cpu')
@@ -134,48 +136,79 @@ def main(args):
     val_list = []
     it = 0
     best = 1.
-    for epoch in range(1, args.num_epochs):
-        inputs = x[:].to(device, dtype=torch.float)
-        forwarded = model(inputs)
+    checkpoint_dir = "./checkpoint_lstm/"
+    model_dir = "./model_lstm/"
 
-        loss = criterion(forwarded.reshape(-1),
-                        output.reshape(-1).to(device, dtype=torch.float))
-        loss_list.append(loss.item())
+    # load model
+    if LOAD is True:
+        # ckp_path = "./checkpoint_lstm/checkpoint.pt"
+        ckp_path = "./model_lstm/best_model.pt"
+        model, _, start_epoch = load_ckp(ckp_path, model)
+        print("loaded", start_epoch)
 
-        # Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        # scheduler.step()
+    try:
+        for epoch in range(1, args.num_epochs):
+            inputs = x[:].to(device, dtype=torch.float)
+            forwarded = model(inputs)
 
-        # plt.ion()
-        if epoch % args.iter == 0:
-            val_forwarded = model(val_input[:].to(device, dtype=torch.float))
-            val_error = np.max(np.abs((val_forwarded.reshape(-1).detach().cpu().numpy
-            ()-val_output.reshape(-1).detach().cpu().numpy())))
-            val_list.append(val_error)
-            print('Epoch [{}/{}], Train loss: {:.12f}, Validation loss: {:.12f}'.format(epoch, args.num_epochs, loss.item(), val_error))
+            loss = criterion(forwarded.reshape(-1),
+                            output.reshape(-1).to(device, dtype=torch.float))
+            loss_list.append(loss.item())
 
-            if val_error < 5:
-                optimizer.param_groups[0]['lr'] = 0.0002
+            # Backward and optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            # scheduler.step()
 
-            if val_error < 0.1:
-                break
+            # plt.ion()
+            if epoch % args.iter == 0:
+                val_forwarded = model(val_input[:].to(device, dtype=torch.float))
+                val_error = np.max(np.abs((val_forwarded.reshape(-1).detach().cpu().numpy
+                ()-val_output.reshape(-1).detach().cpu().numpy())))
+                val_list.append(val_error)
+                print('Epoch [{}/{}], Train loss: {:.12f}, Validation loss: {:.12f}'.format(epoch, args.num_epochs, loss.item(), val_error))
 
-    plt.subplot(2, 1, 1)
-    plt.plot(range(len(loss_list)), np.log10(loss_list))
-    plt.ylabel('training error')
+                if val_error < 1:
+                    optimizer.param_groups[0]['lr'] = 0.0002
 
-    plt.subplot(2, 1, 2)
-    plt.plot(range(len(val_list)), np.log10(val_list))
-    plt.xlabel('epochs')
-    plt.ylabel('validation error')
+                if val_error < 0.1:
+                    break
 
-    plt.show()
+        plt.subplot(2, 1, 1)
+        plt.plot(range(len(loss_list)), np.log10(loss_list))
+        plt.ylabel('training error')
 
-    torch.save(model.state_dict(), 'lstm_'+str(HIDDEN_DIM)+'.ckpt')
-    # summary(model, input_size=(1, n_time_samples))
-    model(inputs)[0]
+        plt.subplot(2, 1, 2)
+        plt.plot(range(len(val_list)), np.log10(val_list))
+        plt.xlabel('epochs')
+        plt.ylabel('validation error')
+
+        plt.show()
+
+        torch.save(model.state_dict(), 'lstm_'+str(HIDDEN_DIM)+'.ckpt')
+        # summary(model, input_size=(1, n_time_samples))
+        model(inputs)[0]
+    except KeyboardInterrupt:
+        plt.subplot(2, 1, 1)
+        plt.plot(range(len(loss_list)), np.log10(loss_list))
+        plt.ylabel('training error')
+
+        plt.subplot(2, 1, 2)
+        plt.plot(range(len(val_list)), np.log10(val_list))
+        plt.xlabel('epochs')
+        plt.ylabel('validation error')
+        plt.savefig("Loss_LSTM" + str(time.ctime()).replace(" ", "") + ".png")
+
+        # save checkpoints
+        is_best=True
+        checkpoint = {
+            'epoch': epoch,
+            'state_dict': model.state_dict(),
+            'optimizer': optimizer.state_dict()
+        }
+        save_ckp(checkpoint, is_best, checkpoint_dir, model_dir)
+        print("Saved checkpoint")
 
 
 if __name__ == '__main__':
@@ -211,6 +244,11 @@ if __name__ == '__main__':
                         default=5,
                         type=int,
                         help='epoch when visualization runs')
+    parser.add_argument('-load',
+                        '--load',
+                        default='False',
+                        type=str,
+                        help='whether to load the model')
     args = parser.parse_args()
 
     main(args)

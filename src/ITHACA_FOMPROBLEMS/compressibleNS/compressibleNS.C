@@ -41,6 +41,7 @@ compressibleNS::compressibleNS() {}
 // Construct from zero
 compressibleNS::compressibleNS(int argc, char* argv[])
 {
+    // #include "postProcess.H"
     _args = autoPtr<argList>
             (
                 new argList(argc, argv)
@@ -52,8 +53,8 @@ compressibleNS::compressibleNS(int argc, char* argv[])
     }
 
     argList& args = _args();
-#include "createTime.H"
-#include "createMesh.H"
+    #include "createTime.H"
+    #include "createMesh.H"
     _pimple = autoPtr<pimpleControl>
               (
                   new pimpleControl
@@ -72,26 +73,33 @@ compressibleNS::compressibleNS(int argc, char* argv[])
             IOobject::NO_WRITE
         )
     );
-#include "createControl.H" // TODO CHECK
-#include "createFields.H"
-#include "createFieldRefs.H" // TODO check
-#include "createFvOptions.H"
+
+    #include "createControl.H" // TODO CHECK
+    #include "createFields.H"
+    #include "initContinuityErrs.H"
+
+    turbulence->validate();
+
     para = ITHACAparameters::getInstance(mesh, runTime);
+
     bcMethod = ITHACAdict->lookupOrDefault<word>("bcMethod", "lift");
     M_Assert(bcMethod == "lift" || bcMethod == "penalty",
              "The BC method must be set to lift or penalty in ITHACAdict");
-    timedepbcMethod = ITHACAdict->lookupOrDefault<word>("timedepbcMethod", "no");
-    M_Assert(timedepbcMethod == "yes" || timedepbcMethod == "no",
-             "The BC method can be set to yes or no");
-    // TODO check on ITHACADict tutorial
-    timeDerivativeSchemeOrder =
-        ITHACAdict->lookupOrDefault<word>("timeDerivativeSchemeOrder", "second");
-    M_Assert(timeDerivativeSchemeOrder == "first"
-             || timeDerivativeSchemeOrder == "second",
-             "The time derivative approximation must be set to either first or second order scheme in ITHACAdict");
+
+    // timedepbcMethod = ITHACAdict->lookupOrDefault<word>("timedepbcMethod", "no");
+    // M_Assert(timedepbcMethod == "yes" || timedepbcMethod == "no",
+    //          "The BC method can be set to yes or no");
+
+    // // TODO check on ITHACADict tutorial
+    // timeDerivativeSchemeOrder =
+    //     ITHACAdict->lookupOrDefault<word>("timeDerivativeSchemeOrder", "second");
+    // M_Assert(timeDerivativeSchemeOrder == "first"
+    //          || timeDerivativeSchemeOrder == "second",
+    //          "The time derivative approximation must be set to either first or second order scheme in ITHACAdict");
+
     offline = ITHACAutilities::check_off();
-    podex = ITHACAutilities::check_pod();
-    supex = ITHACAutilities::check_sup();
+    // podex = ITHACAutilities::check_pod();
+    // supex = ITHACAutilities::check_sup();
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -99,21 +107,39 @@ compressibleNS::compressibleNS(int argc, char* argv[])
 void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
 {
     Time& runTime = _runTime();
-    surfaceScalarField& phi = _phi();
     fvMesh& mesh = _mesh();
-#include "initContinuityErrs.H"
     fv::options& fvOptions = _fvOptions();
     pimpleControl& pimple = _pimple();
+    Info << " # DEBUG compressibleNS.C, line 109 # " << endl;
+    psiThermo& thermo = _thermo();
+    Info << " # DEBUG compressibleNS.C, line 111 # " << endl;
+    surfaceScalarField& phi = _phi();
+    Info << " # DEBUG compressibleNS.C, line 113 # " << endl;
+    volScalarField& rho = _rho();
+    Info << " # DEBUG compressibleNS.C, line 115 # " << endl;
     volScalarField& p = _p();
+    Info << " # DEBUG compressibleNS.C, line 117 # " << endl;
     volVectorField& U = _U();
+    Info << " # DEBUG compressibleNS.C, line 119 # " << endl;
+    volScalarField& psi = _psi();
+    Info << " # DEBUG compressibleNS.C, line 121 # " << endl;
+    volScalarField& e = _E();
+    Info << " # DEBUG compressibleNS.C, line 123 # " << endl;
+    volScalarField& K = _K();
+    Info << " # DEBUG compressibleNS.C, line 125 # " << endl;
     IOMRFZoneList& MRF = _MRF();
-    singlePhaseTransportModel& laminarTransport = _laminarTransport();
+    Info << " # DEBUG compressibleNS.C, line 127 # " << endl;
+    // compressible::turbulenceModel& turbulence = _turbulence();
+    Info << " # DEBUG compressibleNS.C, line 120 # " << endl;
     instantList Times = runTime.times();
     runTime.setEndTime(finalTime);
+
     // Perform a TruthSolve
+    Info << " # DEBUG compressibleNS.C, line 135 # " << Times << " " << timeStep << endl;
     runTime.setTime(Times[1], 1);
     runTime.setDeltaT(timeStep);
     nextWrite = startTime;
+    Info << " # DEBUG compressibleNS.C, line 139 # " << runTime.timeName() << nl << endl;
 
     // Set time-dependent velocity BCs for initial condition
     if (timedepbcMethod == "yes")
@@ -130,78 +156,93 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
             assignBC(U, inletPatch(i, 0), inl);
         }
     }
+    Info << " # DEBUG compressibleNS.C, line 143 # " << endl;
 
     // Export and store the initial conditions for velocity and pressure
     ITHACAstream::exportSolution(U, name(counter), folder);
-    ITHACAstream::exportSolution(p, name(counter), folder);
-    std::ofstream of(folder + name(counter) + "/" +
-                     runTime.timeName());
+    ITHACAstream::exportSolution(rho, name(counter), folder);
+    ITHACAstream::exportSolution(e, name(counter), folder);
+    std::ofstream of(folder + name(counter) + "/" + runTime.timeName());
     Ufield.append(U.clone());
-    Pfield.append(p.clone());
-    counter++;
-    nextWrite += writeEvery;
+    rhofield.append(rho.clone());
+    efield.append(e.clone());
 
-    // Start the time loop
-    while (runTime.run())
+    // #include "readTimeControls.H"
+    runTime.setEndTime(finalTime);
+
+    Info<< "deltaT = " <<  runTime.deltaTValue() << endl;
+
+    Info<< "\nStarting time loop\n" << endl;
+
+    while (runTime.loop())
     {
-#include "readTimeControls.H"
-#include "CourantNo.H"
-#include "setDeltaT.H"
-        runTime.setEndTime(finalTime);
-        runTime++;
         Info << "Time = " << runTime.timeName() << nl << endl;
 
+        #include "compressibleCourantNo.H"
+        // #include "setDeltaT.H"
+
         // Set time-dependent velocity BCs
-        if (timedepbcMethod == "yes")
-        {
-            for (label i = 0; i < inletPatch.rows(); i++)
-            {
-                Vector<double> inl(0, 0, 0);
+        // if (timedepbcMethod == "yes")
+        // {
+        //     for (label i = 0; i < inletPatch.rows(); i++)
+        //     {
+        //         Vector<double> inl(0, 0, 0);
 
-                for (label j = 0; j < inl.size(); j++)
-                {
-                    inl[j] = timeBCoff(i * inl.size() + j, counter2);
-                }
+        //         for (label j = 0; j < inl.size(); j++)
+        //         {
+        //             inl[j] = timeBCoff(i * inl.size() + j, counter2);
+        //         }
 
-                assignBC(U, inletPatch(i, 0), inl);
-            }
+        //         assignBC(U, inletPatch(i, 0), inl);
+        //     }
 
-            counter2 ++;
-        }
+        //     counter2 ++;
+        // }
+
+        #include "rhoEqn.H"
 
         // --- Pressure-velocity PIMPLE corrector loop
         while (pimple.loop())
         {
-#include "UEqn.H"
+            #include "UEqn.H"
+            #include "EEqn.H"
 
             // --- Pressure corrector loop
             while (pimple.correct())
             {
-#include "pEqn.H"
+                #include "pEqn.H"
             }
 
             if (pimple.turbCorr())
             {
-                laminarTransport.correct();
                 turbulence->correct();
             }
         }
 
-        Info << "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
-             << "  ClockTime = " << runTime.elapsedClockTime() << " s"
-             << nl << endl;
+        rhofield.append(rho.clone());
+        rho = thermo.rho();
+
+        runTime.write();
+
+        // Info << "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
+        //      << "  ClockTime = " << runTime.elapsedClockTime() << " s"
+        //      << nl << endl;
+        runTime.printExecutionTime(Info);
 
         if (checkWrite(runTime))
         {
             ITHACAstream::exportSolution(U, name(counter), folder);
-            ITHACAstream::exportSolution(p, name(counter), folder);
+            ITHACAstream::exportSolution(rho, name(counter), folder);
+            ITHACAstream::exportSolution(e, name(counter), folder);
             std::ofstream of(folder + name(counter) + "/" +
                              runTime.timeName());
             Ufield.append(U.clone());
-            Pfield.append(p.clone());
+            rhofield.append(rho.clone());
+            efield.append(e.clone());
             counter++;
             nextWrite += writeEvery;
             writeMu(mu_now);
+
             // --- Fill in the mu_samples with parameters (time, mu) to be used for the PODI sample points
             mu_samples.conservativeResize(mu_samples.rows() + 1, mu_now.size() + 1);
             mu_samples(mu_samples.rows() - 1, 0) = atof(runTime.timeName().c_str());
@@ -243,6 +284,16 @@ bool compressibleNS::checkWrite(Time& timeObject)
     }
 }
 
-
-
-
+void compressibleNS::change_initial_velocity(double mu)
+{
+    Info << " # DEBUG compressibleNS.C, line 269 # " << endl;
+    Vector<double> value(mu, 0, 0);
+    volVectorField& U = _U();
+    Info << " # DEBUG compressibleNS.C, line 272 # " << endl;
+    this->assignIF(U, value);
+    this->assignBC(U, 0, value);
+    Info << " # DEBUG compressibleNS.C, line 275 # " << endl;
+    // ITHACAstream::exportSolution(U, name(mu), "./initial_data/");
+    // ITHACAstream::exportSolution(_U(), name(mu), "./initial_data_/");
+    Info << " # DEBUG compressibleNS.C, line 278 # " << endl;
+}

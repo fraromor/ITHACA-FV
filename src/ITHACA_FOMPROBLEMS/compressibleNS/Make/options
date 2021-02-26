@@ -18,16 +18,10 @@ EXE_INC = \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
     -I$(FOAM_SRC)/functionObjects/forces/lnInclude \
     -I$(LIB_ITHACA_SRC)/ITHACA_FOMPROBLEMS/reductionProblem \
-    -I$(LIB_ITHACA_SRC)/ITHACA_FOMPROBLEMS/laplacianProblem \
     -I$(LIB_ITHACA_SRC)/ITHACA_FOMPROBLEMS/steadyNS \
     -I$(LIB_ITHACA_SRC)/ITHACA_FOMPROBLEMS/unsteadyNS \
-    -I$(LIB_ITHACA_SRC)/ITHACA_FOMPROBLEMS/glassFurnace \
+    -I$(LIB_ITHACA_SRC)/ITHACA_FOMPROBLEMS/compressibleNS \
     -I$(LIB_ITHACA_SRC)/ITHACA_FOMPROBLEMS/lnInclude \
-    -I$(LIB_ITHACA_SRC)/ITHACA_ROMPROBLEMS/ReducedProblem \
-    -I$(LIB_ITHACA_SRC)/ITHACA_ROMPROBLEMS/ReducedUnsteadyNS \
-    -I$(LIB_ITHACA_SRC)/ITHACA_ROMPROBLEMS/ReducedSteadyNS \
-    -I$(LIB_ITHACA_SRC)/ITHACA_ROMPROBLEMS/ReducedLaplacian \
-    -I$(LIB_ITHACA_SRC)/ITHACA_ROMPROBLEMS/NonLinearSolvers \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/ITHACAutilities \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/ITHACAPOD \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/ITHACAparallel \
@@ -44,20 +38,20 @@ EXE_INC = \
     -std=c++11
 
 EXE_LIBS = \
-    -lturbulenceModels \
-    -lincompressibleTransportModels \
-    -lincompressibleTurbulenceModels \
     -lfiniteVolume \
-    -lmeshTools \
     -lfvOptions \
+    -lmeshTools \
     -lsampling \
+    -lcompressibleTransportModels \
     -lfluidThermophysicalModels \
-    -lradiationModels \
+    -lspecie \
+    -lturbulenceModels \
+    -lcompressibleTurbulenceModels \
+    -lturbulenceModels \
     -lspecie \
     -lforces \
     -lfileFormats \
     -lITHACA_FOMPROBLEMS \
-    -lITHACA_ROMPROBLEMS \
     -lITHACA_THIRD_PARTY \
     -lITHACA_CORE \
     -L$(FOAM_USER_LIBBIN)

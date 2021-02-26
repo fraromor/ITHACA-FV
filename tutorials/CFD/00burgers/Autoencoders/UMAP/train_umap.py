@@ -42,7 +42,7 @@ def train(snap_scaled, n_train, n_val):
         print("train, val: ", snap_train.shape, snap_val.shape)
 
         dims = (60, 60, 2)
-        n_components = 4
+        n_components = 2
 
         encoder = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=dims),
@@ -203,7 +203,7 @@ if __name__ == '__main__':
     print("Min max after scaling tf: ", np.min(snap_scaled), np.max(snap_scaled))
     # plot_snapshot(snap_scaled, 2500)
 
-    # train(snap_scaled[:n_total, :], n_train, n_val)
+    train(snap_scaled[:n_total, :], n_train, n_val)
     snap_true_vec = np.load(WM_PROJECT + "npTrueSnapshots.npy")
     assert np.min(snap_true_vec) >= 0., "Snapshots should be clipped"
     # np.save("npTrueSnapshots.npy", snap_true_vec[:, ::5])
