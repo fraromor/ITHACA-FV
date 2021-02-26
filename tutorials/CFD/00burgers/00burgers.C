@@ -303,7 +303,7 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
                         train_FOM.podex, 0, 0, NmodesUout);
 
     Eigen::MatrixXd SnapMatrix = Foam2Eigen::PtrList2Eigen(train_FOM.Ufield);
-    Info << "snapshots size: " << SnapMatrix.size() << endl;
+    // Info << "snapshots size: " << SnapMatrix.size() << endl;
     cnpy::save(SnapMatrix, "npSnapshots.npy");
 
     train_FOM.project("./Matrices", NmodesUproj);
@@ -312,7 +312,7 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
     ITHACAstream::exportFields(train_FOM.L_Umodes, "./ITHACAoutput/POD_and_initial/", "U");
 
     Eigen::MatrixXd modes = Foam2Eigen::PtrList2Eigen(train_FOM.L_Umodes);
-    Info << "modes size: " << modes.size() << endl;
+    // Info << "modes size: " << modes.size() << endl;
     cnpy::save(modes, "npInitialAndModes.npy");
 
     ReducedBurgers reduced(train_FOM);
@@ -368,13 +368,13 @@ void test_one_parameter_initial_velocity(tutorial00 test_FOM)
     if (!ITHACAutilities::check_folder("./ITHACAoutput/Offline/Test/"))
     {
         test_FOM.offline = false;
-        Info << "Offline Test data already exist, reading existing data" << endl;
+        // Info << "Offline Test data already exist, reading existing data" << endl;
     }
 
     test_FOM.offlineSolveInitialVelocity("./ITHACAoutput/Offline/Test/");
     Eigen::MatrixXd trueSnapMatrix = Foam2Eigen::PtrList2Eigen(test_FOM.Ufield);
 
-    Info << "snapshots size: " << trueSnapMatrix.size() << test_FOM.Ufield.size() << endl;
+    // Info << "snapshots size: " << trueSnapMatrix.size() << test_FOM.Ufield.size() << endl;
     cnpy::save(trueSnapMatrix, "npTrueSnapshots.npy");
 
     test_FOM.NUmodes = NmodesUproj;
@@ -451,7 +451,7 @@ void nonlinear_one_parameter_initial_velocity(tutorial00 test_FOM)
     int NmodesUout = para->ITHACAdict->lookupOrDefault<int>("NmodesUout", 15);
     int NmodesUproj = para->ITHACAdict->lookupOrDefault<int>("NmodesUproj", 10);
     int NmodesUtest = para->ITHACAdict->lookupOrDefault<int>("NmodesUtest", 100);
-    int NnonlinearModes = 4; //para->ITHACAdict->lookupOrDefault<int>("NnonlinearModes", 4);
+    int NnonlinearModes = 2; //para->ITHACAdict->lookupOrDefault<int>("NnonlinearModes", 4);
 
     /// Set the number of parameters
     test_FOM.Pnumber = 1;
@@ -470,7 +470,7 @@ void nonlinear_one_parameter_initial_velocity(tutorial00 test_FOM)
     test_FOM.writeEvery = 1;
 
     Eigen::MatrixXd initial_latent;
-    cnpy::load(initial_latent, "./Autoencoders/ConvolutionalAe/latent_initial_4.npy");
+    cnpy::load(initial_latent, "./Autoencoders/ConvolutionalAe/latent_initial_2.npy");
 
     std::cout << "LATENT INIT " << initial_latent << std::endl;
 
@@ -478,7 +478,7 @@ void nonlinear_one_parameter_initial_velocity(tutorial00 test_FOM)
     if (!ITHACAutilities::check_folder("./ITHACAoutput/Offline/Test/"))
     {
         test_FOM.offline = false;
-        Info << "Offline Test data already exist, reading existing data" << endl;
+        // Info << "Offline Test data already exist, reading existing data" << endl;
     }
 
     test_FOM.offlineSolveInitialVelocity("./ITHACAoutput/Offline/Test/");
@@ -489,7 +489,7 @@ void nonlinear_one_parameter_initial_velocity(tutorial00 test_FOM)
     test_FOM.NL_Umodes = test_FOM.L_Umodes.size();
 
     // NM-LSPG
-    NonlinearReducedBurgers reduced_nm_lspg(test_FOM, "./Autoencoders/ConvolutionalAe/decoder_gpu_4.pt", NnonlinearModes, initial_latent);
+    NonlinearReducedBurgers reduced_nm_lspg(test_FOM, "./Autoencoders/ConvolutionalAe/decoder_gpu_2.pt", NnonlinearModes, initial_latent);
 
     // Set values of the reduced model
     reduced_nm_lspg.nu = 0.0001;
@@ -506,7 +506,7 @@ void nonlinear_one_parameter_initial_velocity(tutorial00 test_FOM)
     ITHACAstream::exportFields(reduced_nm_lspg.uRecFields, "./ITHACAoutput/ReconstructionNMLSPG/", "uRec");
     // reduced_nm_lspg.reconstruct(true,"./ITHACAoutput/ReconstructionNMLSPG/");
 
-    Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/tutorials/CFD/00burgers/00burgers.C, line 482 #################### " << test_FOM.Ufield.size() << " " << reduced_nm_lspg.uRecFields.size() << " " << reduced_nm_lspg.online_solution.size() << endl;
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/tutorials/CFD/00burgers/00burgers.C, line 482 #################### " << test_FOM.Ufield.size() << " " << reduced_nm_lspg.uRecFields.size() << " " << reduced_nm_lspg.online_solution.size() << endl;
 
     Eigen::MatrixXd errL2UNMLSPG = ITHACAutilities::errorL2Rel(test_FOM.Ufield,
                                                                reduced_nm_lspg.uRecFields);
@@ -549,7 +549,7 @@ void nonlinear_test_rec(tutorial00 test_FOM)
     if (!ITHACAutilities::check_folder("./ITHACAoutput/Offline/Test/"))
     {
         test_FOM.offline = false;
-        Info << "Offline Test data already exist, reading existing data" << endl;
+        // Info << "Offline Test data already exist, reading existing data" << endl;
     }
 
     test_FOM.offlineSolveInitialVelocity("./ITHACAoutput/Offline/Test/");
@@ -630,7 +630,7 @@ void nonlinear_test_data(tutorial00 test_FOM)
     if (!ITHACAutilities::check_folder("./ITHACAoutput/Offline/Test/"))
     {
         test_FOM.offline = false;
-        Info << "Offline Test data already exist, reading existing data" << endl;
+        // Info << "Offline Test data already exist, reading existing data" << endl;
     }
 
     test_FOM.offlineSolveInitialVelocity("./ITHACAoutput/Offline/Test/");
@@ -733,7 +733,7 @@ void nonlinear_one_parameter_initial_velocity_hr(tutorial00 test_FOM)
     // if (!ITHACAutilities::check_folder("./ITHACAoutput/Offline/Test/"))
     // {
     //     test_FOM.offline = false;
-    //     Info << "Offline Test data already exist, reading existing data" << endl;
+        Info << "Offline Test data already exist, reading existing data" << endl;
     // }
 
     test_FOM.offlineSolveInitialVelocity("ITHACAoutput/Offline/Test/");
@@ -781,7 +781,7 @@ void nonlinear_one_parameter_initial_velocity_hr(tutorial00 test_FOM)
     // ITHACAstream::exportSolution(S, name(1), "./ITHACAoutput/Online/");
 
     // // Compute the L2 error and print it
-    // Info << ITHACAutilities::errorL2Rel(S2, S) << endl;
+    Info << ITHACAutilities::errorL2Rel(S2, S) << endl;
 
     // ITHACAstream::exportMatrix(reduced_nm_lspg.online_solution, "red_coeff", "python", "./ITHACAoutput/red_coeff_NM_LSPG");
 
@@ -789,7 +789,7 @@ void nonlinear_one_parameter_initial_velocity_hr(tutorial00 test_FOM)
     // ITHACAstream::exportFields(reduced_nm_lspg.uRecFields, "./ITHACAoutput/ReconstructionNMLSPG/", "uRec");
     // // reduced_nm_lspg.reconstruct(true,"./ITHACAoutput/ReconstructionNMLSPG/");
 
-    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/tutorials/CFD/00burgers/00burgers.C, line 482 #################### " << test_FOM.Ufield.size() << " " <<  reduced_nm_lspg.uRecFields.size() << " " << reduced_nm_lspg.online_solution.size() << endl;
+    Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/tutorials/CFD/00burgers/00burgers.C, line 482 #################### " << test_FOM.Ufield.size() << " " <<  reduced_nm_lspg.uRecFields.size() << " " << reduced_nm_lspg.online_solution.size() << endl;
 
     // Eigen::MatrixXd errL2UNMLSPG = ITHACAutilities::errorL2Rel(test_FOM.Ufield,
     //                          reduced_nm_lspg.uRecFields);

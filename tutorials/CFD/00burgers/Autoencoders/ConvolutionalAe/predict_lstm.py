@@ -9,7 +9,7 @@ from lstm import *
 from convae import *
 
 WM_PROJECT = "../../"
-HIDDEN_DIM = 4
+HIDDEN_DIM = 2
 DOMAIN_SIZE = 60
 DIM = 2
 

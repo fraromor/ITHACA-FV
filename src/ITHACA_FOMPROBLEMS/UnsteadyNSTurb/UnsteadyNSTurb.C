@@ -677,7 +677,7 @@ void UnsteadyNSTurb::projectSUP(fileName folder, label NU, label NP, label NSUP,
                                        "./ITHACAoutput/Matrices/");
         }
     }
-    
+
     if (para->exportMatlab)
     {
         ITHACAstream::exportMatrix(B_matrix, "B", "matlab", "./ITHACAoutput/Matrices/");

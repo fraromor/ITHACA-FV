@@ -107,8 +107,8 @@ class AE(nn.Module):
                  mean=0):
         super(AE, self).__init__()
         # create the encoder and decoder networks
-        self.encoder = DeepEncoder(hidden_dim, domain_size)
-        self.decoder = DeepDecoder(hidden_dim, domain_size,
+        self.encoder = DeepDeepEncoder(hidden_dim, domain_size)
+        self.decoder = DeepDeepDecoder(hidden_dim, domain_size,
                                        self.encoder.hl, scale, mean)
 
         if use_cuda:
@@ -368,65 +368,9 @@ class DeepDecoder(nn.Module):
         out = out.reshape(-1, self.ds * self.ds * 2)
         return torch.nn.functional.relu(out)  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
 
-# class DeepDeepDecoder(nn.Module):
-#     def __init__(self, hidden_dim, domain_size, hidden_length, scale, mean):
-#         super(DeepDeepDecoder, self).__init__()
-#         self.ds = domain_size
-#         self.hl = 3
-#         self.scale = scale
-#         self.mean = mean
-
-#         self.fc = nn.Sequential(nn.Linear(hidden_dim, 128 * (self.hl)**2),
-#                                 nn.ELU())
-#         self.layer0 = nn.Sequential(
-#             nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2, padding=1),
-#             # nn.BatchNorm2d(64),
-#              nn.ELU())
-#         self.layer1 = nn.Sequential(
-#             nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1),
-#             # nn.BatchNorm2d(32),
-#              nn.ELU())
-#         self.layer2 = nn.Sequential(
-#             nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1),
-#             # nn.BatchNorm2d(16),
-#              nn.ELU())
-#         self.layer3 = nn.Sequential(
-#             nn.ConvTranspose2d(16, 8, kernel_size=4, stride=2, padding=0),
-#             # nn.BatchNorm2d(8),
-#              nn.ELU())
-#         self.layer4 = nn.Sequential(
-#             # nn.UpsamplingBilinear2d(scale_factor=2),
-#             nn.ConvTranspose2d(8, 2, kernel_size=4, stride=2, padding=1),
-#             # nn.BatchNorm2d(2),
-#         )
-
-#     # @clock.clock
-#     def forward(self, z):
-#         # print("LATENT", z.shape, z)
-#         out = self.fc(z)
-#         out = out.reshape(-1, 128, self.hl, self.hl)
-#         # print(out.size())
-#         out = self.layer0(out)
-#         out = self.layer1(out)
-#         # print(out.size())
-#         out = self.layer2(out)
-#         # print(out.size())
-#         out = self.layer3(out)
-#         # print(out.size())
-#         out = self.layer4(out)
-#         # print(out.size())
-#         #
-#         # out = 2 * (out + self.mean - 0.5*(self.scale[1] + self.scale[0])) / ( self.scale[1] - self.scale[0])
-
-#         out *= 0.5 * (self.scale[1] - self.scale[0])
-#         out += 0.5 * (self.scale[1] + self.scale[0])
-#         out += self.mean
-#         out = out.reshape(-1, self.ds * self.ds * 2)
-#         return torch.nn.functional.relu(out)  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
-
 class DeepDeepDecoder(nn.Module):
     def __init__(self, hidden_dim, domain_size, hidden_length, scale, mean):
-        super().__init__()
+        super(DeepDeepDecoder, self).__init__()
         self.ds = domain_size
         self.hl = 3
         self.scale = scale
@@ -435,24 +379,25 @@ class DeepDeepDecoder(nn.Module):
         self.fc = nn.Sequential(nn.Linear(hidden_dim, 128 * (self.hl)**2),
                                 nn.ELU())
         self.layer0 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(128, 64, kernel_size=2, stride=1, padding=0),
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2, padding=1),
+            # nn.BatchNorm2d(64),
              nn.ELU())
         self.layer1 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(64, 32, kernel_size=4, stride=1, padding=0),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1),
+            # nn.BatchNorm2d(32),
              nn.ELU())
         self.layer2 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(32, 16, kernel_size=3, stride=1, padding=1),
+            nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1),
+            # nn.BatchNorm2d(16),
              nn.ELU())
         self.layer3 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(16, 8, kernel_size=3, stride=1, padding=2),
+            nn.ConvTranspose2d(16, 8, kernel_size=4, stride=2, padding=0),
+            # nn.BatchNorm2d(8),
              nn.ELU())
         self.layer4 = nn.Sequential(
-            nn.UpsamplingNearest2d(scale_factor=2),
-            nn.Conv2d(8, 2, kernel_size=3, stride=1, padding=1),
+            # nn.UpsamplingBilinear2d(scale_factor=2),
+            nn.ConvTranspose2d(8, 2, kernel_size=4, stride=2, padding=1),
+            # nn.BatchNorm2d(2),
         )
 
     # @clock.clock
@@ -462,7 +407,6 @@ class DeepDeepDecoder(nn.Module):
         out = out.reshape(-1, 128, self.hl, self.hl)
         # print(out.size())
         out = self.layer0(out)
-        # print(out.size())
         out = self.layer1(out)
         # print(out.size())
         out = self.layer2(out)
@@ -470,13 +414,69 @@ class DeepDeepDecoder(nn.Module):
         out = self.layer3(out)
         # print(out.size())
         out = self.layer4(out)
+        # print(out.size())
+        #
         # out = 2 * (out + self.mean - 0.5*(self.scale[1] + self.scale[0])) / ( self.scale[1] - self.scale[0])
 
-        out = out * 0.5 * (self.scale[1] - self.scale[0])
-        out = out + 0.5 * (self.scale[1] + self.scale[0])
-        out = out + self.mean
+        out *= 0.5 * (self.scale[1] - self.scale[0])
+        out += 0.5 * (self.scale[1] + self.scale[0])
+        out += self.mean
         out = out.reshape(-1, self.ds * self.ds * 2)
         return torch.nn.functional.relu(out)  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
+
+# class DeepDeepDecoder(nn.Module):
+#     def __init__(self, hidden_dim, domain_size, hidden_length, scale, mean):
+#         super().__init__()
+#         self.ds = domain_size
+#         self.hl = 3
+#         self.scale = scale
+#         self.mean = mean
+
+#         self.fc = nn.Sequential(nn.Linear(hidden_dim, 128 * (self.hl)**2),
+#                                 nn.ELU())
+#         self.layer0 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(128, 64, kernel_size=2, stride=1, padding=0),
+#              nn.ELU())
+#         self.layer1 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(64, 32, kernel_size=4, stride=1, padding=0),
+#              nn.ELU())
+#         self.layer2 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(32, 16, kernel_size=3, stride=1, padding=1),
+#              nn.ELU())
+#         self.layer3 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(16, 8, kernel_size=3, stride=1, padding=2),
+#              nn.ELU())
+#         self.layer4 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(8, 2, kernel_size=3, stride=1, padding=1),
+#         )
+
+#     # @clock.clock
+#     def forward(self, z):
+#         # print("LATENT", z.shape, z)
+#         out = self.fc(z)
+#         out = out.reshape(-1, 128, self.hl, self.hl)
+#         # print(out.size())
+#         out = self.layer0(out)
+#         # print(out.size())
+#         out = self.layer1(out)
+#         # print(out.size())
+#         out = self.layer2(out)
+#         # print(out.size())
+#         out = self.layer3(out)
+#         # print(out.size())
+#         out = self.layer4(out)
+
+#         # out = out * (self.scale[1] - self.scale[0]) + self.scale[0]
+#         out = out * 0.5 * (self.scale[1] - self.scale[0])
+#         out = out + 0.5 * (self.scale[1] + self.scale[0])
+#         out = out + self.mean
+#         out = out.reshape(-1, self.ds * self.ds * 2)
+#         return torch.nn.functional.relu(out)  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
 
 class ShallowDecoder(nn.Module):
     def __init__(self, hidden_dim, domain_size, hidden_length, scale):
@@ -576,6 +576,7 @@ class Normalize(object):
         if self._scale_fl:
             snap = snap - 0.5 * (self._min_sn + self._max_sn)
             snap = snap * 2 / (self._max_sn - self._min_sn)
+            # snap = (snap-self._min_sn)/(self._max_sn-self._min_sn)
             # snap /= std
             assert np.max(snap) <= 1.0, "Error in scale " + str(np.max(snap))
             assert np.min(snap) >= -1.0, "Error in scale " + str(np.min(snap))
@@ -588,8 +589,7 @@ class Normalize(object):
         if self._scale_fl:
             snap = snap * (self._max_sn - self._min_sn) / 2
             snap = snap + 0.5 * (self._min_sn + self._max_sn)
-            # snap *= std
-
+            # snap = snap * (self._max_sn - self._min_sn) + self._min_sn
         if self._center_fl:
             if device:
                 mean = torch.from_numpy(self._mean).to(device,
