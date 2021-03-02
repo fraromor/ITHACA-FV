@@ -219,7 +219,6 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
             }
         }
 
-        rhofield.append(rho.clone());
         rho = thermo.rho();
 
         runTime.write();
