@@ -31,7 +31,7 @@ _thermo = autoPtr<psiThermo>(psiThermo::New(mesh));
 _thermo->validate(args.executable(), "e");
 
 _p = autoPtr<volScalarField>(new volScalarField(_thermo->p()));
-_p0 = autoPtr<volScalarField>(new volScalarField(_p().clone()));
+_p0 = autoPtr<volScalarField>(new volScalarField(_p()));
 
 _rho = autoPtr<volScalarField>(
     new volScalarField(
@@ -42,13 +42,13 @@ _rho = autoPtr<volScalarField>(
         _thermo->rho())
     );
 
-_rho0 = autoPtr<volScalarField>(new volScalarField(_rho().clone()));
+_rho0 = autoPtr<volScalarField>(new volScalarField(_rho()));
 
 _E = autoPtr<volScalarField>(new volScalarField(_thermo->he()));
-_E0 = autoPtr<volScalarField>(new volScalarField(_E().clone()));
+_E0 = autoPtr<volScalarField>(new volScalarField(_E()));
 
 _psi = autoPtr<volScalarField>(new volScalarField(_thermo->psi()));
-_psi0 = autoPtr<volScalarField>(new volScalarField(_psi().clone()));
+_psi0 = autoPtr<volScalarField>(new volScalarField(_psi()));
 
 Info << "Reading field U\n" << endl;
 
@@ -63,7 +63,7 @@ _U = autoPtr<volVectorField>(
         mesh));
 
 _U0 = autoPtr<volVectorField>(
-    new volVectorField(_U().clone()));
+    new volVectorField(_U()));
 
 Info<< "Reading/calculating face flux field phi\n" << endl;
 
@@ -96,7 +96,7 @@ Info << "Creating field kinetic energy K\n"
      << endl;
 
 _K = autoPtr<volScalarField>(new volScalarField("K", 0.5 * magSqr(_U())));
-_K0 = autoPtr<volScalarField>(new volScalarField(_K().clone()));
+_K0 = autoPtr<volScalarField>(new volScalarField(_K()));
 
 if (_U().nOldTimes())
 {

@@ -28,10 +28,9 @@ Info << "Reading thermophysical properties\n"
 _thermo = autoPtr<psiThermo>(psiThermo::New(mesh));
 
 // ? create initial _pThermo0
-psiThermo &thermo = _thermo();
-thermo.validate(args.executable(), "e");
+_thermo->validate(args.executable(), "e");
 
-_p = autoPtr<volScalarField>(new volScalarField(thermo.p()));
+_p = autoPtr<volScalarField>(new volScalarField(_thermo->p()));
 _p0 = autoPtr<volScalarField>(new volScalarField(_p()));
 
 _rho = autoPtr<volScalarField>(
@@ -40,15 +39,15 @@ _rho = autoPtr<volScalarField>(
             "rho",
             runTime.timeName(),
             mesh),
-        thermo.rho())
+        _thermo->rho())
     );
 
 _rho0 = autoPtr<volScalarField>(new volScalarField(_rho()));
 
-_E = autoPtr<volScalarField>(new volScalarField(thermo.he()));
+_E = autoPtr<volScalarField>(new volScalarField(_thermo->he()));
 _E0 = autoPtr<volScalarField>(new volScalarField(_E()));
 
-_psi = autoPtr<volScalarField>(new volScalarField(thermo.psi()));
+_psi = autoPtr<volScalarField>(new volScalarField(_thermo->psi()));
 _psi0 = autoPtr<volScalarField>(new volScalarField(_psi()));
 
 Info << "Reading field U\n" << endl;

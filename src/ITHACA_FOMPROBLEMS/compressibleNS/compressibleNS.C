@@ -29,7 +29,7 @@
 \*---------------------------------------------------------------------------*/
 
 #include "compressibleNS.H"
-
+#include "Foam2Eigen.H"
 /// \file
 /// Source file of the compressibleNS class.
 
@@ -41,7 +41,6 @@ compressibleNS::compressibleNS() {}
 // Construct from zero
 compressibleNS::compressibleNS(int argc, char* argv[])
 {
-    // #include "postProcess.H"
     _args = autoPtr<argList>
             (
                 new argList(argc, argv)
@@ -110,27 +109,16 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
     fvMesh& mesh = _mesh();
     fv::options& fvOptions = _fvOptions();
     pimpleControl& pimple = _pimple();
-    Info << " # DEBUG compressibleNS.C, line 109 # " << endl;
     psiThermo& thermo = _thermo();
-    Info << " # DEBUG compressibleNS.C, line 111 # " << endl;
     surfaceScalarField& phi = _phi();
-    Info << " # DEBUG compressibleNS.C, line 113 # " << endl;
     volScalarField& rho = _rho();
-    Info << " # DEBUG compressibleNS.C, line 115 # " << endl;
     volScalarField& p = _p();
-    Info << " # DEBUG compressibleNS.C, line 117 # " << endl;
     volVectorField& U = _U();
-    Info << " # DEBUG compressibleNS.C, line 119 # " << endl;
     volScalarField& psi = _psi();
-    Info << " # DEBUG compressibleNS.C, line 121 # " << endl;
     volScalarField& e = _E();
-    Info << " # DEBUG compressibleNS.C, line 123 # " << endl;
     volScalarField& K = _K();
-    Info << " # DEBUG compressibleNS.C, line 125 # " << endl;
     IOMRFZoneList& MRF = _MRF();
-    Info << " # DEBUG compressibleNS.C, line 127 # " << endl;
     // compressible::turbulenceModel& turbulence = _turbulence();
-    Info << " # DEBUG compressibleNS.C, line 120 # " << endl;
     instantList Times = runTime.times();
     runTime.setEndTime(finalTime);
 
@@ -179,6 +167,7 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
         Info << "Time = " << runTime.timeName() << nl << endl;
 
         #include "compressibleCourantNo.H"
+
         // #include "setDeltaT.H"
 
         // Set time-dependent velocity BCs
@@ -226,6 +215,7 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
         // Info << "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
         //      << "  ClockTime = " << runTime.elapsedClockTime() << " s"
         //      << nl << endl;
+
         runTime.printExecutionTime(Info);
 
         if (checkWrite(runTime))
