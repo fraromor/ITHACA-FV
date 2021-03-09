@@ -92,7 +92,10 @@ class compressibleNS: public steadyNS
 
 
         /// List of pointers to store initial solutions
-        /// Initial Pressure field (for restart purposes)
+        /// Initial thermodynamic properties (for restart purposes)
+        autoPtr<psiThermo> _thermo0;
+
+        /// Initial pressure (for restart purposes)
         autoPtr<volScalarField> _p0;
 
         /// Initial Energy field (for restart purposes)
@@ -119,6 +122,15 @@ class compressibleNS: public steadyNS
 
         /// List of pointers used to form the pressure snapshots matrix
         PtrList<volScalarField> efield;
+
+        /// TODO remove
+        PtrList<volScalarField> saveField;
+
+        /// List of pointers used to form the density modes
+        volScalarModes rhomodes;
+
+        /// List of pointers used to form the internal energy modes
+        volScalarModes emodes;
 
 
         // Specific variable for the unstationary case
@@ -158,6 +170,8 @@ class compressibleNS: public steadyNS
         // Time derivative numerical scheme order
         word timeDerivativeSchemeOrder;
 
+        // Single truth solve counter
+        int counter_truth = 0;
         // Functions
 
         //--------------------------------------------------------------------------
@@ -184,6 +198,8 @@ class compressibleNS: public steadyNS
         /// @param[in]  mu    first component of velocity (scalar)
         ///
         void change_initial_velocity(double mu);
+
+        void restart();
 };
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

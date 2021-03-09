@@ -30,6 +30,7 @@ def main(args):
 
     # snapshots have to be clipped before
     snap_vec = np.load(WM_PROJECT + "npSnapshots.npy")
+    snap_vec = snap_vec[:, ::2]
     assert np.min(snap_vec) >= 0., "Snapshots should be clipped"
 
     # specify how many samples should be used for training and validation

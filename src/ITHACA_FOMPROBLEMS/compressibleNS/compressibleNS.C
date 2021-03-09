@@ -73,7 +73,7 @@ compressibleNS::compressibleNS(int argc, char* argv[])
         )
     );
 
-    #include "createControl.H" // TODO CHECK
+    #include "createControl.H"
     #include "createFields.H"
     #include "initContinuityErrs.H"
 
@@ -97,7 +97,7 @@ compressibleNS::compressibleNS(int argc, char* argv[])
     //          "The time derivative approximation must be set to either first or second order scheme in ITHACAdict");
 
     offline = ITHACAutilities::check_off();
-    // podex = ITHACAutilities::check_pod();
+    podex = ITHACAutilities::check_pod();
     // supex = ITHACAutilities::check_sup();
 }
 
@@ -109,24 +109,27 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
     fvMesh& mesh = _mesh();
     fv::options& fvOptions = _fvOptions();
     pimpleControl& pimple = _pimple();
+
     psiThermo& thermo = _thermo();
+    volScalarField& p = thermo.p();
+    const volScalarField& psi = thermo.psi();
+    volScalarField& e = thermo.he();
+
     surfaceScalarField& phi = _phi();
     volScalarField& rho = _rho();
-    volScalarField& p = _p();
     volVectorField& U = _U();
-    volScalarField& psi = _psi();
-    volScalarField& e = _E();
     volScalarField& K = _K();
     IOMRFZoneList& MRF = _MRF();
-    // compressible::turbulenceModel& turbulence = _turbulence();
     instantList Times = runTime.times();
     runTime.setEndTime(finalTime);
 
     // Perform a TruthSolve
-    Info << " # DEBUG compressibleNS.C, line 135 # " << Times << " " << timeStep << endl;
+    // Info << " # DEBUG compressibleNS.C, line 135 # " << Times << " " << timeStep << endl;
+
     runTime.setTime(Times[1], 1);
     runTime.setDeltaT(timeStep);
     nextWrite = startTime;
+
     Info << " # DEBUG compressibleNS.C, line 139 # " << runTime.timeName() << nl << endl;
 
     // Set time-dependent velocity BCs for initial condition
@@ -144,6 +147,7 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
             assignBC(U, inletPatch(i, 0), inl);
         }
     }
+
     Info << " # DEBUG compressibleNS.C, line 143 # " << endl;
 
     // Export and store the initial conditions for velocity and pressure
@@ -151,6 +155,7 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
     ITHACAstream::exportSolution(rho, name(counter), folder);
     ITHACAstream::exportSolution(e, name(counter), folder);
     std::ofstream of(folder + name(counter) + "/" + runTime.timeName());
+
     Ufield.append(U.clone());
     rhofield.append(rho.clone());
     efield.append(e.clone());
@@ -187,6 +192,7 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
 
         //     counter2 ++;
         // }
+
 
         #include "rhoEqn.H"
 
@@ -229,6 +235,7 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
             rhofield.append(rho.clone());
             efield.append(e.clone());
             counter++;
+            counter_truth++;
             nextWrite += writeEvery;
             writeMu(mu_now);
 
@@ -249,7 +256,10 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
         mu.resize(1, 1);
     }
 
-    if (mu_samples.rows() == counter * mu.cols())
+    Info << " # DEBUG compressibleNS.C, line 258 # " << mu_samples << endl;
+    Info << " # DEBUG compressibleNS.C, line 258 # " << mu_samples.rows() << " " << counter  << " " << counter_truth << " " << mu.cols() << endl;
+
+    if (mu_samples.rows() == (counter_truth -1) * mu.cols())
     {
         ITHACAstream::exportMatrix(mu_samples, "mu_samples", "eigen",
                                    folder);
@@ -262,6 +272,8 @@ bool compressibleNS::checkWrite(Time& timeObject)
     scalar diffnow = mag(nextWrite - atof(timeObject.timeName().c_str()));
     scalar diffnext = mag(nextWrite - atof(timeObject.timeName().c_str()) -
                           timeObject.deltaTValue());
+
+    Info << " # DEBUG compressibleNS.C, line 275 # " << diffnow  << " " << diffnext << endl;
 
     if ( diffnow < diffnext)
     {
@@ -285,4 +297,117 @@ void compressibleNS::change_initial_velocity(double mu)
     // ITHACAstream::exportSolution(U, name(mu), "./initial_data/");
     // ITHACAstream::exportSolution(_U(), name(mu), "./initial_data_/");
     Info << " # DEBUG compressibleNS.C, line 278 # " << endl;
+}
+
+void compressibleNS::restart()
+{
+    counter_truth = 0;
+    _runTime().objectRegistry::clear();
+    _mesh().objectRegistry::clear();
+
+    _pimple.clear();
+    _thermo.clear();
+
+    _rho.clear();
+    _U.clear();
+    _phi.clear();
+
+    turbulence.clear();
+    _fvOptions.clear();
+
+    argList& args = _args();
+
+    Info << "ReCreate time and mesh\n" << Foam::endl;
+
+    Time& runTime = _runTime();
+    Foam::fvMesh& mesh = _mesh();
+
+    _pimple = autoPtr<pimpleControl>
+              (
+                  new pimpleControl
+                  (
+                      mesh
+                  )
+              );
+
+    pimpleControl& pimple = _pimple();
+
+    Info << "Recreating thermophysical properties\n"<< endl;
+
+    _thermo = autoPtr<psiThermo>(psiThermo::New(mesh));
+    _thermo->validate(args.executable(), "e");
+
+    _p = autoPtr<volScalarField>(new volScalarField(_thermo->p()));
+
+    _rho = autoPtr<volScalarField>(
+    new volScalarField(
+        IOobject(
+            "rho",
+            runTime.timeName(),
+            mesh),
+        _thermo->rho())
+    );
+
+    Info << "ReReading field U\n" << endl;
+
+    _U = autoPtr<volVectorField>(
+        new volVectorField(
+            IOobject(
+                "U",
+                runTime.timeName(),
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::AUTO_WRITE),
+            mesh));
+
+    Info << "ReReading/calculating face flux field phi\n" << endl;
+
+    _phi = autoPtr<surfaceScalarField>(new surfaceScalarField
+    (
+        IOobject
+        (
+            "phi",
+            runTime.timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        linearInterpolate(_rho()*_U()) & mesh.Sf()
+    ));
+    mesh.setFluxRequired(_p().name());
+
+    Info << "ReCreating turbulence model\n" << endl;
+
+    turbulence = autoPtr<compressible::turbulenceModel>(
+    compressible::turbulenceModel::New(
+        _rho(),
+        _U(),
+        _phi(),
+        _thermo()));
+
+    Info << "Creating field kinetic energy K\n" << endl;
+
+    _K = autoPtr<volScalarField>(new volScalarField("K", 0.5 * magSqr(_U())));
+    // _K0 = autoPtr<volScalarField>(new volScalarField(_K()));
+
+    if (_U().nOldTimes())
+    {
+        volVectorField *Uold = &_U().oldTime();
+        volScalarField *Kold = &_K().oldTime();
+        *Kold == 0.5 * magSqr(*Uold);
+
+        while (Uold->nOldTimes())
+        {
+            Uold = &Uold->oldTime();
+            Kold = &Kold->oldTime();
+            *Kold == 0.5 * magSqr(*Uold);
+        }
+    }
+
+    _MRF = autoPtr<IOMRFZoneList>(new IOMRFZoneList(mesh));
+
+    _fvOptions = autoPtr<fv::options>(new fv::options(mesh));
+
+    #include "initContinuityErrs.H"
+    turbulence->validate();
 }

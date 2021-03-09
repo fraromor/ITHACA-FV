@@ -552,6 +552,105 @@ template void getModesSVD(PtrList<volVectorField>& snapshots,
                           PtrList<volVectorField>& modes, word fieldName, bool podex, bool supex,
                           bool sup, label nmodes);
 
+template<class Type, template<class> class PatchField, class GeoMesh>
+void getModesRSVD(
+    PtrList<GeometricField<Type, PatchField, GeoMesh>>& snapshots,
+    PtrList<GeometricField<Type, PatchField, GeoMesh>>& modes,
+    word fieldName, bool podex,
+    bool supex, bool sup, label nmodes)
+{
+    ITHACAparameters* para(ITHACAparameters::getInstance());
+
+    if ((podex == 0 && sup == 0) || (supex == 0 && sup == 1))
+    {
+        PtrList<volVectorField> Bases;
+        modes.resize(nmodes);
+        Info << "####### Performing POD using randomized Singular Value Decomposition for " <<
+             snapshots[0].name() << " #######" << endl;
+        Eigen::MatrixXd SnapMatrix = Foam2Eigen::PtrList2Eigen(snapshots);
+        Info << " # DEBUG ITHACAPOD.C, line 571 # " << SnapMatrix.rows() << " x " << SnapMatrix.cols() << endl;
+        Eigen::VectorXd V = ITHACAutilities::getMassMatrixFV(snapshots[0]);
+        Eigen::VectorXd V3dSqrt = V.array().sqrt();
+        Eigen::VectorXd V3dInv = V3dSqrt.array().cwiseInverse();
+        auto VMsqr = V3dSqrt.asDiagonal();
+        auto VMsqrInv = V3dInv.asDiagonal();
+        Eigen::MatrixXd SnapMatrix2 = VMsqr * SnapMatrix;
+
+        // rsvd
+        RedSVD::RedSVD<Eigen::MatrixXd> redsvd;
+        redsvd.compute(SnapMatrix2, nmodes);
+
+        Info << "####### End of the POD for " << snapshots[0].name() << " #######" << endl;
+
+        Eigen::VectorXd eigenValueseig;
+        Eigen::MatrixXd eigenVectoreig;
+        eigenValueseig = redsvd.singularValues().real();
+        eigenVectoreig = redsvd.matrixU().real();
+        Info << " # DEBUG ITHACAPOD.C, line 588 # " << eigenVectoreig.rows() << " x " << eigenVectoreig.cols() << endl;
+        Eigen::MatrixXd modesEig = VMsqrInv * eigenVectoreig;
+        GeometricField<Type, PatchField, GeoMesh> tmb_bu(snapshots[0].name(),
+                snapshots[0] * 0);
+
+        for (label i = 0; i < nmodes; i++)
+        {
+            Eigen::VectorXd vec = modesEig.col(i);
+            tmb_bu = Foam2Eigen::Eigen2field(tmb_bu, vec);
+            modes.set(i, tmb_bu.clone());
+        }
+
+        eigenValueseig = eigenValueseig / eigenValueseig.sum();
+        Eigen::VectorXd cumEigenValues(eigenValueseig);
+
+        for (label j = 1; j < cumEigenValues.size(); ++j)
+        {
+            cumEigenValues(j) += cumEigenValues(j - 1);
+        }
+
+        Info << "####### Saving the POD bases for " << snapshots[0].name() <<
+             " #######" << endl;
+
+        if (sup)
+        {
+            ITHACAstream::exportFields(modes, "./ITHACAoutput/supremizer/",
+                                       snapshots[0].name());
+        }
+        else
+        {
+            ITHACAstream::exportFields(modes, "./ITHACAoutput/POD/", snapshots[0].name());
+        }
+
+        //exportBases(modes, snapshots, sup);
+        Eigen::saveMarketVector(eigenValueseig,
+                                "./ITHACAoutput/POD/Eigenvalues_" + snapshots[0].name(), para->precision,
+                                para->outytpe);
+        Eigen::saveMarketVector(cumEigenValues,
+                                "./ITHACAoutput/POD/CumEigenvalues_" + snapshots[0].name(), para->precision,
+                                para->outytpe);
+
+    }
+    else
+    {
+        Info << "Reading the existing modes" << endl;
+
+        if (sup == 1)
+        {
+            ITHACAstream::read_fields(modes, fieldName + "sup",
+                                      "./ITHACAoutput/supremizer/");
+        }
+        else
+        {
+            ITHACAstream::read_fields(modes, fieldName, "./ITHACAoutput/POD/");
+        }
+    }
+}
+
+template void getModesRSVD(PtrList<volScalarField>& snapshots,
+                          PtrList<volScalarField>& modes, word fieldName, bool podex, bool supex,
+                          bool sup, label nmodes);
+
+template void getModesRSVD(PtrList<volVectorField>& snapshots,
+                          PtrList<volVectorField>& modes, word fieldName, bool podex, bool supex,
+                          bool sup, label nmodes);
 
 /// Construct the Correlation Matrix for Scalar Field
 template<>

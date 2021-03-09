@@ -237,19 +237,19 @@ class DeepDeepEncoder(nn.Module):
             # nn.BatchNorm2d(8),
              nn.ELU())
         self.layer2 = nn.Sequential(
-            nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(8, 16, kernel_size=5, stride=2, padding=2),
             # nn.BatchNorm2d16),
              nn.ELU())
         self.layer3 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(16, 32, kernel_size=5, stride=2, padding=2),
             # nn.BatchNorm2d(32),
              nn.ELU())
         self.layer4 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(32, 64, kernel_size=5, stride=2, padding=2),
             # nn.BatchNorm2d(32),
              nn.ELU())
         self.layer5 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=2, stride=2, padding=1),
+            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=2),
             # nn.BatchNorm2d(64),
              nn.ELU())
         self.fc = nn.Sequential(nn.Linear(128 * 3**2, hidden_dim))  #, Swish())
@@ -383,7 +383,7 @@ class DeepDeepDecoder(nn.Module):
             # nn.BatchNorm2d(64),
              nn.ELU())
         self.layer1 = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1),
+            nn.ConvTranspose2d(64, 32, kernel_size=5, stride=2, padding=2),
             # nn.BatchNorm2d(32),
              nn.ELU())
         self.layer2 = nn.Sequential(

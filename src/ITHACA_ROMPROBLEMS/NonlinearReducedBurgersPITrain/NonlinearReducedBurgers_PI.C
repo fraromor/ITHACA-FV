@@ -284,7 +284,7 @@ void Embedding::train()
     std::cout << "Finished loading test ... " << train_snap_unscaled.size(0) << std::endl;
 
     std::cout << "Training...\n";
-    auto test_loss_norm = torch::frobenius_norm(torch::abs(train_snap_unscaled));
+    auto test_loss_norm = torch::frobenius_norm(train_snap_unscaled);
 
     autoencoder->train();
 

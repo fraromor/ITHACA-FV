@@ -52,6 +52,8 @@ SourceFiles
 #include <unsupported/Eigen/SparseExtra>
 #pragma GCC diagnostic pop
 
+#include <redsvd>
+
 /*---------------------------------------------------------------------------*\
                         Class reductionProblem Declaration
 \*---------------------------------------------------------------------------*/
@@ -114,6 +116,32 @@ void getModesSVD(
     word fieldName,
     bool podex, bool supex = 0, bool sup = 0, label nmodes = 0);
 
+//------------------------------------------------------------------------------
+/// @brief      Gets the modes of a list of scalar/vectorial internal fields
+///             using randomized SVD instead of the method of snapshots
+///
+/// @param[in]  snapshots   List of snapshots.
+/// @param[out] modes       A PtrList where modes are stored (it must be passed
+///                         empty).
+/// @param[in]  fieldName   The file name
+/// @param[in]  podex       If 1, the functions read the stored mode. If 0, the
+///                         function computes the modes and stores them.
+/// @param[in]  supex       If 1, the functions read the stored supremizer mode.
+///                         If 0, the function computes and stores them.
+/// @param[in]  sup         If 1 it computes the supremizer modes.
+/// @param[in]  nmodes      Number of modes to be stored. If 0, the maximum
+///                         number of modes will computed.
+///
+/// @tparam     Type        vector or scalar.
+/// @tparam     PatchField  fvPatchField or fvsPatchField.
+/// @tparam     GeoMesh     volMesh or surfaceMesh.
+///
+template<class Type, template<class> class PatchField, class GeoMesh>
+void getModesRSVD(
+    PtrList<GeometricField<Type, PatchField, GeoMesh>>&
+    snapshots, PtrList<GeometricField<Type, PatchField, GeoMesh>>& modes,
+    word fieldName,
+    bool podex, bool supex = 0, bool sup = 0, label nmodes = 0);
 
 //------------------------------------------------------------------------------
 /// Nested-POD approach. Computes the nested snapshot matrix and weighted bases
