@@ -44,7 +44,7 @@ SourceFiles
 #include <string>
 #include <algorithm>
 
-using namespace ITHACAtorch;
+#include "ConvAe.H"
 
 class tutorial00 : public compressibleNS
 {
@@ -64,20 +64,102 @@ public:
 
         if (offline)
         {
-            ITHACAstream::read_fields(Ufield, "U", folder);
-            // ITHACAstream::exportFields(Ufield, "./TRAIN", "uTrain");
+            ITHACAstream::read_fields(Ufield, "U", folder, 1);
+            ITHACAstream::read_fields(rhofield, "rho", folder, 1);
+            ITHACAstream::read_fields(efield, "e", folder, 1);
         }
         else
         {
-            for (label i = 0; i < mu.cols(); i++)
+            std::cout << "Current mu = " << mu(0, 0) << std::endl;
+            mu_now[0] = mu(0, 0);
+            change_initial_velocity(mu(0, 0));
+            truthSolve(mu_now, folder);
+
+            for (label i = 1; i < mu.cols(); i++)
             {
+                std::cout << "Current mu = " << mu(0, i) << std::endl;
                 mu_now[0] = mu(0, i);
-                // change_initial_velocity(mu(0, i));
-                Info << " # DEBUG 20compressible.C, line 76 # " << endl;
+                restart();
+                change_initial_velocity(mu(0, i));
                 truthSolve(mu_now, folder);
             }
         }
     }
+
+    // ! it would be more efficient to implement inside getModesRSVD
+    torch::Tensor compress(PtrList<volScalarField>& fields, PtrList<volScalarField>& modes, fileName name)
+    {
+        Info << "Compress field "  << endl;
+
+        Eigen::MatrixXd compressed;
+
+        Eigen::MatrixXd SnapMatrix = Foam2Eigen::PtrList2Eigen(fields);
+        Info << "Snap shapes: " << SnapMatrix.rows() << " x " <<SnapMatrix.cols() << endl;
+
+        Eigen::MatrixXd Modes = Foam2Eigen::PtrList2Eigen(modes);
+        Info << "Modes shapes: " << Modes.rows() << " x " << Modes.cols() << endl;
+
+        Eigen::MatrixXd modesTransposed = Modes.transpose();
+        torch::Tensor modesTransposedTorch = ITHACAtorch::torch2Eigen::eigenMatrix2torchTensor(modesTransposed);
+        torch::save(modesTransposedTorch, "modes" + name + ".pt");
+
+        compressed = modesTransposed * SnapMatrix;
+
+        torch::Tensor tensor = ITHACAtorch::torch2Eigen::eigenMatrix2torchTensor(compressed);
+
+
+        std::cout << "End compress field with size " << tensor.sizes() << std::endl;
+        return tensor;
+    };
+
+    /// Compress 2d vectorial fields
+    torch::Tensor compress(PtrList<volVectorField>& fields, PtrList<volVectorField>& modes, fileName name)
+    {
+        Info << "Compress fields "  << endl;
+
+        Eigen::MatrixXd snapMatrix = Foam2Eigen::PtrList2Eigen(fields);
+        Info << "Snap shapes: " <<snapMatrix.rows() << " x " <<snapMatrix.cols() << endl;
+
+        Eigen::MatrixXd Modes = Foam2Eigen::PtrList2Eigen(modes);
+        Info << "Modes shapes: " << Modes.rows() << " x " << Modes.cols() << endl;
+
+        // dimension of a single component of a vectorial snapshot
+        int dofScalar = Modes.rows()/3;
+        std::cout << "dofScalar: " << dofScalar << std::endl;
+
+        // first component
+        Eigen::MatrixXd compressed1;
+        Eigen::MatrixXd modesTransposed1 = Modes.block(0, 0, dofScalar, Modes.cols()).transpose();
+        torch::Tensor modesTransposedTorch1 = ITHACAtorch::torch2Eigen::eigenMatrix2torchTensor(modesTransposed1);
+        torch::save(modesTransposedTorch1, "modes" + name + "_0.pt");
+
+        compressed1 = modesTransposed1 * snapMatrix.block(0, 0, dofScalar, snapMatrix.cols());
+//         cnpy::save(compressed1, name + "_0.npy");
+        // cnpy::save(modesTransposed1, "modes" + name + "_0.npy");
+
+        std::cout << "Compressed field first component " << compressed1.rows() << " x " << compressed1.cols() << std::endl;
+        std::cout << "Compressed modes first component " << modesTransposed1.rows() << " x " << modesTransposed1.cols() << std::endl;
+
+        // second component
+        Eigen::MatrixXd compressed2;
+        Eigen::MatrixXd modesTransposed2 = Modes.block(dofScalar, 0, dofScalar, Modes.cols()).transpose();
+        torch::Tensor modesTransposedTorch2 = ITHACAtorch::torch2Eigen::eigenMatrix2torchTensor(modesTransposed2);
+        torch::save(modesTransposedTorch2, "modes" + name + "_1.pt");
+
+        compressed2 = modesTransposed2 * snapMatrix.block(dofScalar, 0, dofScalar, snapMatrix.cols());
+        // cnpy::save(compressed2, name + "_1.npy");
+        // cnpy::save(modesTransposed2, "modes" + name + "_1.npy");
+
+        std::cout << "Compressed field second component " << compressed2.rows() << " x " << compressed2.cols() << std::endl;
+        std::cout << "Compressed modes second component " << modesTransposed2.rows() << " x " << modesTransposed2.cols() << std::endl;
+
+        torch::Tensor tensor1 = ITHACAtorch::torch2Eigen::eigenMatrix2torchTensor(compressed1);
+        torch::Tensor tensor2 = ITHACAtorch::torch2Eigen::eigenMatrix2torchTensor(compressed2);
+        auto tensor = torch::cat({tensor1, tensor2}, 0);
+
+        std::cout << "End compress field with size " << tensor.sizes() << std::endl;
+        return tensor;
+    };
 };
 
 /*---------------------------------------------------------------------------*\
@@ -91,6 +173,9 @@ void nonlinear_one_parameter_initial_velocity(tutorial00);
 void nonlinear_test_rec(tutorial00);
 void nonlinear_test_data(tutorial00);
 void nonlinear_one_parameter_initial_velocity_hr(tutorial00);
+
+void train_ConvAe(tutorial00);
+void decompress(tutorial00);
 
 int main(int argc, char *argv[])
 {
@@ -116,11 +201,19 @@ int main(int argc, char *argv[])
         // save mu_samples and training snapshots reduced coefficients
         train_one_parameter_initial_velocity(example);
     }
-    // else if (std::strcmp(argv[1], "test") == 0)
+    else if (std::strcmp(argv[1], "ae") == 0)
+    {
+        train_ConvAe(example);
+    }
+    // else if (std::strcmp(argv[1], "decompress") == 0)
     // {
-    //     // compute FOM, ROM-intrusive, ROM-nonintrusive and evaluate errors
-    //     test_one_parameter_initial_velocity(example);
+    //     decompress(example);
     // }
+    else if (std::strcmp(argv[1], "test") == 0)
+    {
+        // compute FOM, ROM-intrusive, ROM-nonintrusive and evaluate errors
+        test_one_parameter_initial_velocity(example);
+    }
     // else if (std::strcmp(argv[1], "nonlinear") == 0)
     // {
     //     // compute NM-LSPG and evaluate errors
@@ -160,7 +253,7 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
     /// Set the number of parameters
     train_FOM.Pnumber = 1;
     /// Set the dimension of the training set
-    train_FOM.Tnumber = 2;
+    train_FOM.Tnumber = 5;
     /// Instantiates a void Pnumber-by-Tnumber matrix mu for the parameters and a void
     /// Pnumber-by-2 matrix mu_range for the ranges
     train_FOM.setParameters();
@@ -175,35 +268,338 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
     train_FOM.startTime = 0;
     train_FOM.finalTime = 10;
     train_FOM.timeStep = 0.002;
-    train_FOM.writeEvery = 0.1;
+    train_FOM.writeEvery = 0.01;
 
     // Perform The Offline Solve;
     train_FOM.offlineSolveMach("./ITHACAoutput/Offline/Training/");
 
-    // Perform a POD decomposition for velocity
-    // TODO rSVD
-    ITHACAPOD::getModes(train_FOM.Ufield, train_FOM.Umodes, train_FOM._U().name(),
-                        train_FOM.podex, 0, 0, NmodesUout);
+    // Perform the compression of the U, rho, e fields with rSVD
+    int m{6}; // m x m frame dimension
+    int NmodesCompression{pow(2, 2*m)};
 
-    Eigen::MatrixXd SnapMatrix = Foam2Eigen::PtrList2Eigen(train_FOM.Ufield);
-    cnpy::save(SnapMatrix, "npSnapshots.npy");
+    // Perform a POD wiht rSVD decomposition for velocity
+    Info << endl << "Start compressing with reduced dimension " << NmodesCompression << endl;
 
-    // The initial conditions are used as the first mode
-    ITHACAstream::exportFields(train_FOM.Umodes, "./ITHACAoutput/POD_and_initial/", "U");
+    ITHACAstream::read_fields(train_FOM.Umodes, "U", "./ITHACAoutput/POD/", 1);
+    // ITHACAPOD::getModesSVD(train_FOM.Ufield, train_FOM.Umodes, train_FOM._U().name(),train_FOM.podex, 0, 0, NmodesCompression);
 
-    Eigen::MatrixXd modes = Foam2Eigen::PtrList2Eigen(train_FOM.Umodes);
-    cnpy::save(modes, "npInitialAndModes.npy");
+    ITHACAstream::read_fields(train_FOM.rhomodes, "rho", "./ITHACAoutput/POD/", 1);
+    // ITHACAPOD::getModesSVD(train_FOM.rhofield, train_FOM.rhomodes, train_FOM._rho().name(),/*train_FOM.podex*/ 1, 0, 0, NmodesCompression);
 
-    /// Set the dimension of the training set
-    train_FOM.Tnumber = 1;
+    ITHACAstream::read_fields(train_FOM.emodes, "e", "./ITHACAoutput/POD/", 1);
+    // ITHACAPOD::getModesSVD(train_FOM.efield, train_FOM.emodes, "e", /*train_FOM.podex*/ 1, 0, 0, NmodesCompression);
+
+    torch::Tensor Ucompressed;
+    torch::Tensor rhocompressed;
+    torch::Tensor ecompressed;
+
+    int n_snap = train_FOM.efield.size();
+    Ucompressed = train_FOM.compress(train_FOM.Ufield, train_FOM.Umodes, "U").transpose(0, 1).reshape({n_snap, 2, pow(2, m), pow(2, m)}).contiguous();
+    rhocompressed = train_FOM.compress(train_FOM.rhofield, train_FOM.rhomodes, "rho").transpose(0, 1).reshape({n_snap, 1, pow(2, m), pow(2, m)}).contiguous();
+    ecompressed = train_FOM.compress(train_FOM.efield, train_FOM.emodes, "e").transpose(0, 1).reshape({n_snap, 1, pow(2, m), pow(2, m)}).contiguous();
+
+    // torch::save(Ucompressed, "./ITHACAoutput/compressed/compressedU.pt");
+    // torch::save(rhocompressed, "./ITHACAoutput/compressed/compressedrho.pt");
+    // torch::save(ecompressed, "./ITHACAoutput/compressed/compressede.pt");
+    // Info << " Torch tensors compressed saved " << endl;
+
+    // stack w.r.t. r the dimension reduced with rSVD : r x n_snap
+    torch::Tensor tensor = torch::cat({std::move(Ucompressed), std::move(rhocompressed), std::move(ecompressed)}, 1);
+    std::cout << " Compressed tensor shape: " << tensor.sizes() << std::endl;
+    torch::save(tensor, "compressedSnap.pt");
+    tensor = tensor.reshape({n_snap, 4*pow(2, m)*pow(2, m)});
+    Eigen::MatrixXd tensorEig = ITHACAtorch::torch2Eigen::torchTensor2eigenMatrix<double>(tensor);
+    cnpy::save(tensorEig, "compressedSnap.npy");
+}
+
+void test_one_parameter_initial_velocity(tutorial00 test_FOM)
+{
+    // Read parameters from ITHACAdict file
+    ITHACAparameters *para = ITHACAparameters::getInstance(test_FOM._mesh(),
+                                                           test_FOM._runTime());
+    int NmodesUout = para->ITHACAdict->lookupOrDefault<int>("NmodesUout", 15);
+    int NmodesUproj = para->ITHACAdict->lookupOrDefault<int>("NmodesUproj", 10);
+
+    /// Set the number of parameters
+    test_FOM.Pnumber = 1;
+    /// Set the dimension of the test set
+    test_FOM.Tnumber = 1;
     // sample test set
-    train_FOM.setParameters();
+    test_FOM.setParameters();
     // Set the parameter ranges
-    train_FOM.mu_range(0, 0) = 3.3;
-    train_FOM.mu_range(0, 1) = 3.9;
+    test_FOM.mu_range(0, 0) = 3.3;
+    test_FOM.mu_range(0, 1) = 3.9;
     // Generate a number of Tnumber linearly equispaced samples inside the parameter range
-    train_FOM.genRandPar();
-    cnpy::save(train_FOM.mu, "parTest.npy");
+    test_FOM.genRandPar();
+    cnpy::save(test_FOM.mu, "parTest.npy");
+
+    // Generate a number of Tnumber linearly equispaced samples inside the parameter range
+    // Eigen::MatrixXd mu;
+    // test_FOM.mu = cnpy::load(mu, "parTest.npy");
+
+    // Time parameters
+    test_FOM.startTime = 0;
+    test_FOM.finalTime = 10;
+    test_FOM.timeStep = 0.002;
+    test_FOM.writeEvery = 0.01;
+
+    // Perform The Offline Solve;
+    if (!ITHACAutilities::check_folder("./ITHACAoutput/Offline/Test/"))
+    {
+        test_FOM.offline = false;
+    }
+
+    test_FOM.offlineSolveMach("./ITHACAoutput/Offline/Test/");
+    Eigen::MatrixXd trueSnapMatrix = Foam2Eigen::PtrList2Eigen(test_FOM.Ufield);
+    // cnpy::save(trueSnapMatrix, "npTrueSnapshots.npy");
+
+    int m{6}; // m x m frame dimension
+    int NmodesCompression{pow(2, 2*m)};
+
+    Info << endl << "Start compressing with reduced dimension " << NmodesCompression << endl;
+
+    ITHACAstream::read_fields(test_FOM.Umodes, "U", "./ITHACAoutput/POD/", 1);
+    ITHACAstream::read_fields(test_FOM.rhomodes, "rho", "./ITHACAoutput/POD/", 1);
+    ITHACAstream::read_fields(test_FOM.emodes, "e", "./ITHACAoutput/POD/", 1);
+
+    torch::Tensor Ucompressed;
+    torch::Tensor rhocompressed;
+    torch::Tensor ecompressed;
+
+    int n_snap = test_FOM.efield.size();
+    Info << " # DEBUG 20compressible.C, line 230 # " << n_snap << endl;
+    Ucompressed = test_FOM.compress(test_FOM.Ufield, test_FOM.Umodes, "U").transpose(0, 1).reshape({n_snap, 2, pow(2, m), pow(2, m)}).contiguous();
+    rhocompressed = test_FOM.compress(test_FOM.rhofield, test_FOM.rhomodes, "rho").transpose(0, 1).reshape({n_snap, 1, pow(2, m), pow(2, m)}).contiguous();
+    ecompressed = test_FOM.compress(test_FOM.efield, test_FOM.emodes, "e").transpose(0, 1).reshape({n_snap, 1, pow(2, m), pow(2, m)}).contiguous();
+
+    // stack w.r.t. r the dimension reduced with rSVD : r x n_snap
+    torch::Tensor tensor = torch::cat({std::move(Ucompressed), std::move(rhocompressed), std::move(ecompressed)}, 1);
+
+    std::cout << " # DEBUG 20compressible.C, line 238 # tensor shape: " << tensor.sizes() << std::endl;
+
+    torch::save(tensor, "compressedSnapTest.pt");
+    tensor = tensor.reshape({n_snap, 4*pow(2, m)*pow(2, m)});
+    Eigen::MatrixXd tensorEig =
+    ITHACAtorch::torch2Eigen::torchTensor2eigenMatrix<double>(tensor);
+    cnpy::save(tensorEig, "compressedSnapTest.npy");
+
+
+}
+
+void train_ConvAe(tutorial00 train_FOM)
+{
+    /// Load train data
+    // Eigen::MatrixXd compressedEig;
+    // compressedEig = cnpy::load(compressedEig, "compressedSnap.npy");
+
+    torch::Tensor compressedTorch;
+    torch::load(compressedTorch, "compressedSnap.pt");//ITHACAtorch::torch2Eigen::eigenMatrix2torchTensor(compressedEig);
+    int m{6};
+    int n_train = compressedTorch.sizes()[0];
+    // compressedTorch = compressedTorch.view({-1, 4, pow(2, m), pow(2, m)});
+    std::cout << "Loaded train dataset with shape " << compressedTorch.sizes() << std::endl;
+
+    // initialize normalization parameters
+    torch::Tensor min_sn = std::get<0>(torch::min(compressedTorch.transpose(1, 0).reshape({4, 5005*pow(64, 2)}), 1));
+    torch::Tensor max_sn = std::get<0>(torch::max(compressedTorch.transpose(1, 0).reshape({4, 5005*pow(64, 2)}), 1));
+    std::cout << "Min values: " << min_sn.view({1, -1}) << std::endl;
+    std::cout << "Max values: " << max_sn.view({1, -1}) << std::endl;
+
+    torch::Tensor scaledTorch = (compressedTorch - min_sn.view({1, -1, 1, 1}))/(max_sn-min_sn).view({1, -1, 1, 1});
+
+    torch::Tensor min_sn_ = std::get<0>(torch::min(scaledTorch.transpose(1, 0).reshape({4, 5005*pow(64, 2)}), 1));
+    torch::Tensor max_sn_ = std::get<0>(torch::max(scaledTorch.transpose(1, 0).reshape({4, 5005*pow(64, 2)}), 1));
+    std::cout << "Min values: " << min_sn_.view({1, -1}) << std::endl;
+    std::cout << "Max values: " << max_sn_.view({1, -1}) << std::endl;
+
+    // save normalizing tensors
+    torch::save(min_sn , "min_sn.pt");
+    torch::save(max_sn , "max_sn.pt");
+    std::cout << "Saved normalizing tensors" << std::endl;
+
+    auto data_set = autoPtr<SnapDataset>(new SnapDataset(scaledTorch));
+
+    /// Load test data
+    torch::Tensor compressedTorchTest;
+    torch::load(compressedTorchTest, "compressedSnapTest.pt");
+    std::cout << "Loaded test dataset with shape " << compressedTorchTest.sizes() << std::endl;
+    int n_test = compressedTorchTest.sizes()[0];
+
+    torch::Tensor min_sn_test = std::get<0>(torch::min(compressedTorchTest.transpose(1, 0).reshape({4, n_test*pow(64, 2)}), 1));
+    torch::Tensor max_sn_test = std::get<0>(torch::max(compressedTorchTest.transpose(1, 0).reshape({4, n_test*pow(64, 2)}), 1));
+    std::cout << "Min values test: " << min_sn_test.view({1, -1}) << std::endl;
+    std::cout << "Max values test: " << max_sn_test.view({1, -1}) << std::endl;
+
+    torch::Tensor scaledTorchTest = (compressedTorchTest - min_sn.view({1, -1, 1, 1}))/(max_sn-min_sn).view({1, -1, 1, 1});
+
+    min_sn_test = std::get<0>(torch::min(scaledTorchTest.transpose(1, 0).reshape({4, n_test*pow(64, 2)}), 1));
+    max_sn_test = std::get<0>(torch::max(scaledTorchTest.transpose(1, 0).reshape({4, n_test*pow(64, 2)}), 1));
+    std::cout << "Min values test: " << min_sn_test.view({1, -1}) << std::endl;
+    std::cout << "Max values test: " << max_sn_test.view({1, -1}) << std::endl;
+
+    /// Train
+
+    // Device
+    auto cuda_available = torch::cuda::is_available();
+    torch::Device device(cuda_available ? torch::kCUDA : torch::kCPU);
+    std::cout << (cuda_available ? "CUDA available. Training on GPU." : "Training on CPU.") << '\n';
+
+    // Hyper-parameters
+    const int64_t batch_size = 100;
+    const size_t num_epochs = 100;
+    const double learning_rate = 1e-3;
+    const int testEval = 10;
+
+    // Autoencoder training parameters
+    auto autoencoder = std::shared_ptr<Autoencoder>(new Autoencoder(4));
+    autoencoder->to(device);
+
+    auto optimizer = new torch::optim::Adam(autoencoder->parameters(),
+                                               torch::optim::AdamOptions(learning_rate));
+    // Generate a data loader.
+    auto data_loader = torch::data::make_data_loader<torch::data::samplers::RandomSampler>(
+    std::move(data_set()),
+    batch_size);
+
+    torch::Tensor snap_rec;
+
+    if (!ITHACAutilities::check_file("convae.pt"))
+    {
+        std::cout << "Training...\n";
+        autoencoder->train();
+        auto train_norm = torch::frobenius_norm(scaledTorch);
+
+        for (int64_t epoch = 1; epoch <= num_epochs; ++epoch)
+        {
+            torch::Tensor loss{torch::zeros({1})};
+            loss = loss.to(device);
+
+            for (auto& batch : *data_loader)
+            {
+                optimizer->zero_grad();
+
+                torch::Tensor data = torch::zeros({batch_size, 4, pow(2, m), pow(2, m)}) ;
+                torch::Tensor bb;
+
+                // TODO fix the batch initialization
+                for (int i; i< batch_size; i++)
+                {
+                    bb = batch[i];
+                    // std::cout << "bb " << bb.size(1) << std::endl;
+                    data.slice(0, i, i+1)=batch[i];
+                }
+
+                // std::cout << "batch shape " << data.sizes() << std::endl;
+
+                torch::Tensor snap_rec = autoencoder->forward(data.to(at::kFloat).to(device));
+
+                // std::cout << "rec shape " << snap_rec.size(0) << " " << snap_rec.size(1) << std::endl;
+
+                auto loss_ = torch::nn::functional::mse_loss(snap_rec, data.to(device), torch::kSum);
+
+                loss_.backward();
+                optimizer->step();
+
+                // std::cout << loss_.item<float>() << std::endl;
+                loss = loss + loss_;
+            }
+
+            auto mean_loss = loss / n_train;
+
+            std::cout << "Epoch, Loss: " << epoch << " Mean RMS: " << mean_loss.item<float>() << std::endl;
+
+            if (epoch % testEval == 0)
+            {
+                autoencoder->to(torch::kCPU);
+                snap_rec = autoencoder->forward(scaledTorchTest.to(at::kFloat).to(torch::kCPU));
+                // auto train_rel_loss =
+                // torch::frobenius_norm(snap_rec-scaledTorchTest)/train_norm;
+                auto test_rel_loss = torch::max(torch::abs(snap_rec-scaledTorchTest));
+                std::cout << "Train, max Rel Loss: " << test_rel_loss.item<float>() << std::endl;
+                autoencoder->to(device);
+            }
+
+        }
+
+        // save net
+        torch::save(autoencoder, "convae.pt");
+        torch::save(snap_rec, "snap_rec.pt");
+        std::cout << std::endl << "Net saved" << std::endl;
+    }
+
+    // save net
+    torch::load(autoencoder, "convae.pt");
+    torch::load(snap_rec, "snap_rec.pt");
+
+    torch::Tensor modesU0;
+    torch::load(modesU0, "modesU_0.pt");
+    std::cout << "mode U0 " << modesU0.sizes() << std::endl;
+
+    torch::Tensor modesU1;
+    torch::load(modesU1, "modesU_1.pt");
+    std::cout << "mode U1 " << modesU1.sizes() << std::endl;
+
+    torch::Tensor modesrho;
+    torch::load(modesrho, "modesrho.pt");
+    std::cout << "mode rho " << modesrho.sizes() << std::endl;
+
+    torch::Tensor modese;
+    torch::load(modese, "modese.pt");
+    std::cout << "mode e " << modese.sizes() << std::endl;
+
+    // Decompress
+    snap_rec = snap_rec * (max_sn-min_sn).view({1, -1, 1, 1}) + min_sn.view({1, -1, 1, 1});
+    snap_rec = snap_rec.view({-1, 4, pow(2, 2*m)});
+    std::cout << "snap_rec: " << snap_rec.sizes() << std::endl;
+
+    torch::Tensor U0 = snap_rec.index({torch::indexing::Slice(), 0, torch::indexing::Slice()});
+    std::cout << "U0: " << U0.sizes() << std::endl;
+    Eigen::MatrixXd U0Eig = ITHACAtorch::torch2Eigen::torchTensor2eigenMatrix<double>(U0);
+
+    torch::Tensor U1 = snap_rec.index({torch::indexing::Slice(), 1, torch::indexing::Slice()});
+    std::cout << "U1: " << U1.sizes() << std::endl;
+    Eigen::MatrixXd U1Eig = ITHACAtorch::torch2Eigen::torchTensor2eigenMatrix<double>(U1);
+
+    torch::Tensor rho = snap_rec.index({torch::indexing::Slice(), 2, torch::indexing::Slice()});
+    std::cout << "rho: " << rho.sizes() << std::endl;
+    Eigen::MatrixXd rhoEig = ITHACAtorch::torch2Eigen::torchTensor2eigenMatrix<double>(rho);
+
+    torch::Tensor e = snap_rec.index({torch::indexing::Slice(), 3, torch::indexing::Slice()});
+    std::cout << "e: " << e.sizes() << std::endl;
+    Eigen::MatrixXd eEig = ITHACAtorch::torch2Eigen::torchTensor2eigenMatrix<double>(e);
+
+    // Decompress
+    std::cout << std::endl << " Decompress ..." << std::endl;
+    torch::Tensor U0_dec = torch::matmul(U0, modesU0).unsqueeze(1);
+    std::cout << "U0_dec: " << U0_dec.sizes() << std::endl;
+    torch::Tensor U1_dec = torch::matmul(U1, modesU1).unsqueeze(1);
+    std::cout << "U1_dec: " << U1_dec.sizes() << std::endl;
+    torch::Tensor rho_dec = torch::matmul(rho, modesrho);
+    std::cout << "rho_dec: " << rho_dec.sizes() << std::endl;
+    torch::Tensor e_dec = torch::matmul(e, modese);
+    std::cout << "e_dec: " << e_dec.sizes() << std::endl;
+
+    // Save decompressed fields
+    std::cout << std::endl << "Export decompressed fields ..." << std::endl;
+    torch::Tensor U_dec = torch::cat({U0_dec, U1_dec, torch::zeros({U0_dec.sizes()[0], 1, U0_dec.sizes()[2]})}, 1).transpose(1, 2).contiguous().reshape({U0_dec.sizes()[0], -1});
+    auto U_list = ITHACAtorch::torch2Foam::torch2PtrList<vector>(U_dec);
+    auto rho_list = ITHACAtorch::torch2Foam::torch2PtrList<scalar>(rho_dec);
+    auto e_list = ITHACAtorch::torch2Foam::torch2PtrList<scalar>(e_dec);
+
+    train_FOM.offlineSolveMach("./ITHACAoutput/Offline/Test/");
+    auto field =  train_FOM.Ufield[0];
+    PtrList<volVectorField> U_list_;
+
+    for(int i=0; i<U_list.size(); i++)
+    {
+        field.ref().field() = U_list[0];
+        U_list_.append(field);
+    }
+
+    ITHACAstream::exportFields(U_list_, "U_decompressed", "U");
+    // ITHACAstream::exportFields(rho_list, "rho_decompressed", "rho");
+    // ITHACAstream::exportFields(e_list, "e_decompressed", "e");
+
 }
 
 // void test_one_parameter_initial_velocity(tutorial00 test_FOM)
