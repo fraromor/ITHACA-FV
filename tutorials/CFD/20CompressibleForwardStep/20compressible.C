@@ -259,7 +259,7 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
     /// Set the number of parameters
     train_FOM.Pnumber = 1;
     /// Set the dimension of the training set
-    train_FOM.Tnumber = 5;
+    train_FOM.Tnumber = 10;
     /// Instantiates a void Pnumber-by-Tnumber matrix mu for the parameters and a void
     /// Pnumber-by-2 matrix mu_range for the ranges
     train_FOM.setParameters();
@@ -294,17 +294,17 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
         train_FOM.U1field.append(train_FOM.Ufield[i].component(1));
     }
 
-    ITHACAstream::read_fields(train_FOM.U0modes, "U.component(0)", "./ITHACAoutput/POD/", 1);
-    // ITHACAPOD::getModesSVD(train_FOM.U0field, train_FOM.U0modes, "U_0",train_FOM.podex, 0, 0, NmodesCompression);
+    // ITHACAstream::read_fields(train_FOM.U0modes, "U.component(0)", "./ITHACAoutput/POD/", 1);
+    ITHACAPOD::getModesSVD(train_FOM.U0field, train_FOM.U0modes, train_FOM.U0field[0].name(), 0, 0, 0, NmodesCompression);
 
-    // ITHACAstream::read_fields(train_FOM.U1modes, "U.component(1)", "./ITHACAoutput/POD/", 1);
-    ITHACAPOD::getModesSVD(train_FOM.U1field, train_FOM.U1modes, "U_1",0, 0, 0, NmodesCompression);
+    ITHACAstream::read_fields(train_FOM.U1modes, train_FOM.U1field[0].name(), "./ITHACAoutput/POD/", 1);
+    // ITHACAPOD::getModesSVD(train_FOM.U1field, train_FOM.U1modes, "U_1",0, 0, 0, NmodesCompression);
 
-    // ITHACAstream::read_fields(train_FOM.rhomodes, "rho", "./ITHACAoutput/POD/", 1);
-    ITHACAPOD::getModesSVD(train_FOM.rhofield, train_FOM.rhomodes, "rho",/*train_FOM.podex*/ 0, 0, 0, NmodesCompression);
+    ITHACAstream::read_fields(train_FOM.rhomodes, "rho", "./ITHACAoutput/POD/", 1);
+    // ITHACAPOD::getModesSVD(train_FOM.rhofield, train_FOM.rhomodes, "rho",/*train_FOM.podex*/ 0, 0, 0, NmodesCompression);
 
-    // ITHACAstream::read_fields(train_FOM.emodes, "e", "./ITHACAoutput/POD/", 1);
-    ITHACAPOD::getModesSVD(train_FOM.efield, train_FOM.emodes, "e", /*train_FOM.podex*/ 0, 0, 0, NmodesCompression);
+    ITHACAstream::read_fields(train_FOM.emodes, "e", "./ITHACAoutput/POD/", 1);
+    // ITHACAPOD::getModesSVD(train_FOM.efield, train_FOM.emodes, "e", /*train_FOM.podex*/ 0, 0, 0, NmodesCompression);
 
     torch::Tensor U0compressed;
     torch::Tensor U1compressed;

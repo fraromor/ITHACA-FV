@@ -259,11 +259,13 @@ void compressibleNS::truthSolve(List<scalar> mu_now, fileName folder)
     Info << " # DEBUG compressibleNS.C, line 258 # " << mu_samples << endl;
     Info << " # DEBUG compressibleNS.C, line 258 # " << mu_samples.rows() << " " << counter  << " " << counter_truth << " " << mu.cols() << endl;
 
-    if (mu_samples.rows() == (counter_truth -1) * mu.cols())
-    {
-        ITHACAstream::exportMatrix(mu_samples, "mu_samples", "eigen",
-                                   folder);
-    }
+    // TODO fix if statement does not equal True when it should
+    ITHACAstream::exportMatrix(mu_samples, "mu_samples", "eigen", folder);
+    // if (mu_samples.rows() == counter_truth * mu.cols())
+    // {
+    //     ITHACAstream::exportMatrix(mu_samples, "mu_samples", "eigen",
+    //                                folder);
+    // }
 }
 
 

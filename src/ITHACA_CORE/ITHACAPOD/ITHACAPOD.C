@@ -488,7 +488,8 @@ void getModesSVD(
         Eigen::MatrixXd eigenVectoreig;
         eigenValueseig = svd.singularValues().real();
         eigenVectoreig = svd.matrixU().real();
-        Eigen::MatrixXd modesEig = VMsqrInv * eigenVectoreig;
+
+        Eigen::MatrixXd modesEig = eigenVectoreig;//TODO VMsqrInv *
         GeometricField<Type, PatchField, GeoMesh> tmb_bu(snapshots[0].name(),
                 snapshots[0] * 0);
 
