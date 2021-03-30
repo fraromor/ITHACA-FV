@@ -117,6 +117,37 @@ template double errorLinfRel(GeometricField<vector, fvPatchField, volMesh>&
                              field1,
                              GeometricField<vector, fvPatchField, volMesh>& field2);
 
+template<typename T>
+Eigen::MatrixXd errorLinfRel(PtrList<GeometricField<T, fvPatchField, volMesh>>&
+                             fields1,
+                             PtrList<GeometricField<T, fvPatchField, volMesh>>& fields2)
+{
+    Eigen::VectorXd err;
+
+    if (fields1.size() != fields2.size())
+    {
+        Info << "The two fields do not have the same size, code will abort" << endl;
+        exit(0);
+    }
+
+    err.resize(fields1.size(), 1);
+
+    for (label k = 0; k < fields1.size(); k++)
+    {
+        err(k, 0) = errorLinfRel(fields1[k], fields2[k]);
+        // Info << " Error is " << err[k] << endl;
+    }
+
+    return err;
+}
+
+template Eigen::MatrixXd errorLinfRel(
+    PtrList<GeometricField<scalar, fvPatchField, volMesh>>& fields1,
+    PtrList<GeometricField<scalar, fvPatchField, volMesh>>& fields2);
+template Eigen::MatrixXd errorLinfRel(
+    PtrList<GeometricField<vector, fvPatchField, volMesh>>& fields1,
+    PtrList<GeometricField<vector, fvPatchField, volMesh>>& fields2);
+
 template<>
 double errorL2Abs(GeometricField<vector, fvPatchField, volMesh>& field1,
                   GeometricField<vector, fvPatchField, volMesh>& field2, volScalarField& Volumes)
@@ -170,7 +201,7 @@ Eigen::MatrixXd errorL2Rel(PtrList<GeometricField<T, fvPatchField, volMesh>>&
     for (label k = 0; k < fields1.size(); k++)
     {
         err(k, 0) = errorL2Rel(fields1[k], fields2[k]);
-        Info << " Error is " << err[k] << endl;
+        // Info << " Error is " << err[k] << endl;
     }
 
     return err;
@@ -305,10 +336,19 @@ double LinfNorm(GeometricField<scalar, fvPatchField, volMesh>& field)
 template<>
 double LinfNorm(GeometricField<vector, fvPatchField, volMesh>& field)
 {
-    double a;
-    Info << "LinfNorm(GeometricField<vector, fvPatchField, volMesh>& field) is still to be implemented"
-         << endl;
-    exit(12);
+    double a{1e-6};
+    for (int i = 0; i < 3; i++)
+    {
+        a = std::max(Foam::max(Foam::sqrt(field.internalField().component(i) *
+                             field.internalField().component(i))).value(), a);
+    }
+    // a = std::max(Foam::max(Foam::sqrt(field.internalField().x() *
+    //                          field.internalField().x())).value(), a);
+    // a = std::max(Foam::max(Foam::sqrt(field.internalField().() *
+    //                          field.internalField().())).value(), a);
+    // a = std::max(Foam::max(Foam::sqrt(field.internalField().x() *
+    //                          field.internalField().x())).value(), a);
+
     return a;
 }
 

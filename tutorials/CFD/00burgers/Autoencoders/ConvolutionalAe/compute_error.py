@@ -50,6 +50,7 @@ error_max = err_max/norm_max
 print("error max: ", np.max(err_max), np.min(err_max))
 print("norm error max: ", np.max(norm_max), np.min(norm_max))
 print("relative error max : ", np.max(error_max), np.min(error_max))
+np.save("errmaxUconvAeNonIntrusive.npy", error_max)
 
 ################################################## COMPUTE PROJECTION ERROR
 
@@ -57,6 +58,7 @@ err_snap_proj_true = np.load(WM_PROJECT+"snapshotsConvAeTrueProjection.npy")
 snap_proj_frame = err_snap_proj_true.reshape(n_test, 2, domain_size, domain_size)
 # plot_snapshot(snap_proj_frame, 1000)
 
+# rel L2
 err_abs = np.abs(snap_proj_frame-snap_true_frame)
 err_vec = err_abs.reshape(n_test, -1)
 error_proj = np.linalg.norm(err_vec, axis=1)
@@ -65,6 +67,12 @@ error_proj_rel = error_proj/norm
 print("relative projection error shape", error_proj.shape)
 print("relative projection error", np.log10(np.max(error_proj_rel)), np.log10(np.min(error_proj_rel)))
 np.save("errL2UconvAeProjection.npy", error_proj_rel)
+
+error_proj = np.max(err_vec, axis=1)
+norm = np.max(snap_true_vec, axis=1)
+error_proj_rel = error_proj/norm
+print("relative projection error shape", error_proj.shape)
+np.save("errmaxUconvAeProjection.npy", error_proj_rel)
 
 x, y = np.meshgrid(np.arange(domain_size), np.arange(domain_size))
 z = err_abs[1000, 0, x, y]

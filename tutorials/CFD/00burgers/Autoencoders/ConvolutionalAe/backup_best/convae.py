@@ -228,7 +228,7 @@ class DeepEncoder(nn.Module):
 
 class DeepDeepEncoder(nn.Module):
     def __init__(self, hidden_dim, domain_size):
-        super(DeepDeepEncoder, self).__init__()
+        super().__init__()
         self.ds = domain_size
         self.hl = 3
         # print(self.hl)
@@ -273,14 +273,14 @@ class DeepDeepEncoder(nn.Module):
     def eval_size(self):
         convlayer = lambda x: np.floor((x - 5 + 2) / 2 + 1)
         lastconvlayer = lambda x: np.floor((x - 4 + 2) / 2 + 1)
-        # print(convlayer(self.ds))
-        # print(convlayer(convlayer(self.ds)))
-        # print(convlayer(convlayer(convlayer(self.ds))))
+        print(convlayer(self.ds))
+        print(convlayer(convlayer(self.ds)))
+        print(convlayer(convlayer(convlayer(self.ds))))
         return lastconvlayer(convlayer(convlayer(convlayer(self.ds))))
 
-class DeepDecoder(nn.Module):
+class DeepDecoderTrans(nn.Module):
     def __init__(self, hidden_dim, domain_size, hidden_length, scale, mean):
-        super(DeepDecoder, self).__init__()
+        super().__init__()
         self.ds = domain_size
         self.hl = hidden_length
         self.scale = scale
@@ -304,13 +304,13 @@ class DeepDecoder(nn.Module):
     def forward(self, z):
         out = self.fc(z)
         out = out.reshape(-1, 64, self.hl, self.hl)
-        # print(out.size())
+        print(out.size())
         out = self.layer1(out)
-        # print(out.size())
+        print(out.size())
         out = self.layer2(out)
-        # print(out.size())
+        print(out.size())
         out = self.layer3(out)
-        # print(out.size())
+        print(out.size())
         out = self.layer4(out).reshape(-1, self.ds * self.ds * 2)
 
         out *= 0.5 * (self.scale[1] - self.scale[0])
@@ -318,6 +318,55 @@ class DeepDecoder(nn.Module):
 
         return out  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
 
+class DeepDecoder(nn.Module):
+    def __init__(self, hidden_dim, domain_size, hidden_length, scale, mean):
+        super().__init__()
+        self.ds = domain_size
+        self.hl = 3
+        self.scale = scale
+        self.mean = mean
+
+        self.fc = nn.Sequential(nn.Linear(hidden_dim, 64 * (self.hl)**2),
+                                nn.ELU())
+        self.layer0 = nn.Sequential(
+            nn.UpsamplingNearest2d(scale_factor=2),
+            nn.Conv2d(64, 32, kernel_size=2, stride=1, padding=1),
+             nn.ELU())
+        self.layer1 = nn.Sequential(
+            nn.UpsamplingNearest2d(scale_factor=2),
+            nn.Conv2d(32, 16, kernel_size=3, stride=1, padding=1),
+             nn.ELU())
+        self.layer2 = nn.Sequential(
+            nn.UpsamplingNearest2d(scale_factor=2),
+            nn.Conv2d(16, 8, kernel_size=3, stride=1, padding=2),
+             nn.ELU())
+        self.layer3 = nn.Sequential(
+            nn.UpsamplingNearest2d(scale_factor=2),
+            nn.Conv2d(8, 2, kernel_size=3, stride=1, padding=1),
+             nn.ELU())
+
+    # @clock.clock
+    def forward(self, z):
+        print("LATENT", z.shape, z)
+        out = self.fc(z)
+        out = out.reshape(-1, 64, self.hl, self.hl)
+        print(out.size())
+        out = self.layer0(out)
+        print(out.size())
+        out = self.layer1(out)
+        print(out.size())
+        out = self.layer2(out)
+        print(out.size())
+        out = self.layer3(out)
+        print(out.size())
+
+        # out = 2 * (out + self.mean - 0.5*(self.scale[1] + self.scale[0])) / ( self.scale[1] - self.scale[0])
+
+        out = out * 0.5 * (self.scale[1] - self.scale[0])
+        out = out + 0.5 * (self.scale[1] + self.scale[0])
+        out = out + self.mean
+        out = out.reshape(-1, self.ds * self.ds * 2)
+        return torch.nn.functional.relu(out)  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
 
 class DeepDeepDecoder(nn.Module):
     def __init__(self, hidden_dim, domain_size, hidden_length, scale, mean):
@@ -375,6 +424,59 @@ class DeepDeepDecoder(nn.Module):
         out = out.reshape(-1, self.ds * self.ds * 2)
         return torch.nn.functional.relu(out)  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
 
+# class DeepDeepDecoder(nn.Module):
+#     def __init__(self, hidden_dim, domain_size, hidden_length, scale, mean):
+#         super().__init__()
+#         self.ds = domain_size
+#         self.hl = 3
+#         self.scale = scale
+#         self.mean = mean
+
+#         self.fc = nn.Sequential(nn.Linear(hidden_dim, 128 * (self.hl)**2),
+#                                 nn.ELU())
+#         self.layer0 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(128, 64, kernel_size=2, stride=1, padding=0),
+#              nn.ELU())
+#         self.layer1 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(64, 32, kernel_size=4, stride=1, padding=0),
+#              nn.ELU())
+#         self.layer2 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(32, 16, kernel_size=3, stride=1, padding=1),
+#              nn.ELU())
+#         self.layer3 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(16, 8, kernel_size=3, stride=1, padding=2),
+#              nn.ELU())
+#         self.layer4 = nn.Sequential(
+#             nn.UpsamplingBilinear2d(scale_factor=2),
+#             nn.Conv2d(8, 2, kernel_size=3, stride=1, padding=1),
+#         )
+
+#     # @clock.clock
+#     def forward(self, z):
+#         # print("LATENT", z.shape, z)
+#         out = self.fc(z)
+#         out = out.reshape(-1, 128, self.hl, self.hl)
+#         # print(out.size())
+#         out = self.layer0(out)
+#         # print(out.size())
+#         out = self.layer1(out)
+#         # print(out.size())
+#         out = self.layer2(out)
+#         # print(out.size())
+#         out = self.layer3(out)
+#         # print(out.size())
+#         out = self.layer4(out)
+
+#         # out = out * (self.scale[1] - self.scale[0]) + self.scale[0]
+#         out = out * 0.5 * (self.scale[1] - self.scale[0])
+#         out = out + 0.5 * (self.scale[1] + self.scale[0])
+#         out = out + self.mean
+#         out = out.reshape(-1, self.ds * self.ds * 2)
+#         return torch.nn.functional.relu(out)  #*(self.scale[1]-self.scale[0])+self.scale[0]  # vectorized
 
 class ShallowDecoder(nn.Module):
     def __init__(self, hidden_dim, domain_size, hidden_length, scale):
@@ -474,6 +576,7 @@ class Normalize(object):
         if self._scale_fl:
             snap = snap - 0.5 * (self._min_sn + self._max_sn)
             snap = snap * 2 / (self._max_sn - self._min_sn)
+            # snap = (snap-self._min_sn)/(self._max_sn-self._min_sn)
             # snap /= std
             assert np.max(snap) <= 1.0, "Error in scale " + str(np.max(snap))
             assert np.min(snap) >= -1.0, "Error in scale " + str(np.min(snap))
@@ -486,8 +589,7 @@ class Normalize(object):
         if self._scale_fl:
             snap = snap * (self._max_sn - self._min_sn) / 2
             snap = snap + 0.5 * (self._min_sn + self._max_sn)
-            # snap *= std
-
+            # snap = snap * (self._max_sn - self._min_sn) + self._min_sn
         if self._center_fl:
             if device:
                 mean = torch.from_numpy(self._mean).to(device,

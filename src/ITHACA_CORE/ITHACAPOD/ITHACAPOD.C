@@ -489,7 +489,7 @@ void getModesSVD(
         eigenValueseig = svd.singularValues().real();
         eigenVectoreig = svd.matrixU().real();
 
-        Eigen::MatrixXd modesEig = VMsqrtINv * eigenVectoreig;
+        Eigen::MatrixXd modesEig = VMsqrInv * eigenVectoreig;
         GeometricField<Type, PatchField, GeoMesh> tmb_bu(snapshots[0].name(),
                 snapshots[0] * 0);
 
@@ -588,7 +588,7 @@ void getModesRSVD(
         eigenValueseig = redsvd.singularValues().real();
         eigenVectoreig = redsvd.matrixU().real();
         Info << " # DEBUG ITHACAPOD.C, line 588 # " << eigenVectoreig.rows() << " x " << eigenVectoreig.cols() << endl;
-        Eigen::MatrixXd modesEig = VMsqrInv * eigenVectoreig;
+        Eigen::MatrixXd modesEig = eigenVectoreig;//TODO VMsqrInv *
         GeometricField<Type, PatchField, GeoMesh> tmb_bu(snapshots[0].name(),
                 snapshots[0] * 0);
 

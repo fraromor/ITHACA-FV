@@ -209,7 +209,7 @@ public:
     /// Recontructed velocity fields list
     PtrList<volVectorField> uRecFields;
 
-    /// List of pointers to store the snapshots for velocity
+    /// List of pointers to store the snapshots for residuals
     PtrList<volScalarField> residualsList;
 
     /// Newton object used to solve the non linear problem
@@ -249,7 +249,7 @@ public:
     double exportEvery;
 
     /// A variable for exporting the sList
-    double exportResidual=0;
+    double exportResidual{0};
 
     /// A variable for starting solving the reduced system from zero or not
     bool startFromZero = false;

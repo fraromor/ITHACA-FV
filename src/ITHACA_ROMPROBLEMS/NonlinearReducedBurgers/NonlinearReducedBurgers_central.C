@@ -40,7 +40,6 @@ License
 #include <chrono>
 #include "cnpy.H"
 
-
 #include "NonlinearReducedBurgers_central.H"
 
 using namespace ITHACAtorch;
@@ -60,7 +59,7 @@ NonlinearReducedBurgers::NonlinearReducedBurgers(Burgers &FOMproblem, fileName d
     embedding = autoPtr<Embedding>(new Embedding(Nphi_u, decoder_path, problem->L_Umodes[0], latent_initial));
 
     // FOMproblem is only needed for initial conditions
-    newton_object = newton_nmlspg_burgers(Nphi_u, 2*embedding->output_dim, FOMproblem, embedding.ref(), problem->L_Umodes[0]);
+    newton_object = newton_nmlspg_burgers(Nphi_u, 2 * embedding->output_dim, FOMproblem, embedding.ref(), problem->L_Umodes[0]);
 }
 
 Embedding::Embedding(int dim, fileName decoder_path, volVectorField &U0, Eigen::MatrixXd lat_init) : latent_dim{dim}, latent_initial{lat_init}
@@ -144,81 +143,17 @@ autoPtr<volVectorField> Embedding::forward(const Eigen::VectorXd &x, const scala
     return g;
 }
 
-// /* Since torch::autograd::jacobian is not implemented in libtorch yet, this is
-// one of among the possible ways to compute the full jacobian with
-// torch::autograd::grad.The drawback is that 7200-by-4 repeated inputs are
-// forwarded to obtain an output of dimension 7200-by-7200 and then a costly
-// backward is computed. Since this operation could require a lot of GPU memory,
-// the evaluation of the components of the jacobian is split in 2 batches of
-// 3600.*/
-// autoPtr<Eigen::MatrixXd> Embedding::jacobian(const Eigen::VectorXd &x, const scalar mu)
-// {
-//     // dimension of degrees of freedom associated to x and y components
-//     int jacobian_out_dim = output_dim * 2; // 7200
-//     Eigen::MatrixXd input_matrix{x};
-
-//     input_matrix.resize(1, latent_dim);
-//     torch::Tensor input_tensor = torch2Eigen::eigenMatrix2torchTensor(std::move(input_matrix));
-//     input_tensor = input_tensor.reshape({1, latent_dim}).set_requires_grad(true);
-
-//     // compute the jacobian with batches of 3600 for a total of 7200 components.
-//     // Since torch::autograd::
-//     auto input_repeated = input_tensor.repeat({3600, 1});
-//     input_repeated = input_repeated.set_requires_grad(true);
-
-//     // declare input of decoder of type IValue since the decoder is loaded from
-//     // pytorch. The tensor inputs of the decoder must be of type at::kFloat (not double)
-//     std::vector<torch::jit::IValue> input_jac;
-//     input_jac.push_back(input_repeated.to(at::kFloat).to(torch::kCUDA));
-
-//     // term to multiply with matrix-to-matrix product with the Jacobian of the
-//     // net: since it is the identity 7200-by-7200 matrix we obtainexactly the Jacobian.
-//     auto grad_output = torch::eye(output_dim * 2);
-
-//     // initialize the jacobian of the decoder of size jacobian_out_dim-by-latent_dim
-//     torch::Tensor forward_tensor = decoder->forward(input_jac).toTensor().squeeze();
-//     auto J = torch::ones({jacobian_out_dim, latent_dim});
-
-//     // compute the jacobian with batches of 3600 for a total of 7200 components
-//     for(int i=0; i<2; i++)
-//     {
-//         auto grad_component = grad_output.slice(0, i*3600, (1+i)*3600).to(torch::kCUDA);
-//         forward_tensor.backward(grad_component, true);
-
-//         auto gradient = torch::autograd::grad({forward_tensor},
-//                                           {input_repeated},
-//                                           /*grad_outputs=*/{grad_component},
-//                                           /*retain_graph=*/true,
-//                                           /*create_graph=*/true);
-
-//         J.slice(/*dim*/0, i*3600, (1+i)*3600) = gradient[0].detach();
-//     }
-
-//     auto grad_eigen = torch2Eigen::torchTensor2eigenMatrix<double>(J);
-//     auto dg = autoPtr<Eigen::MatrixXd>(new Eigen::MatrixXd(std::move(grad_eigen)));
-
-//     return dg;
-// }
-
-// std::pair<autoPtr<volVectorField>, autoPtr<Eigen::MatrixXd>> Embedding::forward_with_gradient(const Eigen::VectorXd &x, const scalar mu)
-// {
-//     auto g = forward(x, mu);
-//     auto dg = jacobian(x, mu);
-//     return std::make_pair(g, dg);
-// }
-
 // Operator to evaluate the residual
 int newton_nmlspg_burgers::operator()(const Eigen::VectorXd &x, Eigen::VectorXd &fvec) const
 {
     std::cout << " residual, x = " << x.transpose() << std::endl;
 
     auto g = embedding->forward(x, mu);
-    volVectorField& a_tmp = g();
-    fvMesh& mesh = problem->_mesh();
-
+    volVectorField &a_tmp = g();
+    fvMesh &mesh = problem->_mesh();
 
     auto a_old = g_old();
-    volVectorField& tmp = a_tmp.oldTime();
+    volVectorField &tmp = a_tmp.oldTime();
     tmp = a_old;
 
     auto phi = linearInterpolate(a_tmp) & mesh.Sf();
@@ -230,6 +165,11 @@ int newton_nmlspg_burgers::operator()(const Eigen::VectorXd &x, Eigen::VectorXd 
     a_tmp.field() = resEqn.residual();
 
     fvec = Foam2Eigen::field2Eigen(a_tmp).col(0).head(this->embedding->output_dim * 2);
+
+    if (mdeim_fl == true)
+    {
+        system_mdeim = std::move(resEqn);
+    }
 
     // this->embedding->save_field.append(a_tmp.clone());
 
@@ -261,6 +201,8 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
              "The variable exportEvery must be an integer multiple of the time step dt.");
     M_Assert(ITHACAutilities::isInteger(exportResidual / dt) == true,
              "The variable storeEvery must be an integer multiple of the time step dt.");
+    M_Assert(ITHACAutilities::isInteger(exportMatricesMDEIM / dt) == true,
+             "The variable storeEvery must be an integer multiple of the time step dt.");
     M_Assert(ITHACAutilities::isInteger(exportEvery / storeEvery) == true,
              "The variable exportEvery must be an integer multiple of the variable storeEvery.");
     // Info << " # DEBUG NonlinearReducedBurgers_central.C, line 266 # " << endl;
@@ -268,6 +210,11 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
 
     // numberOfResiduals defaults to 0 and in that case no residual is saved
     int numberOfResiduals = round(exportResidual / dt);
+    int numberOfMatricesMDEIM = round(exportMatricesMDEIM / dt);
+    if (numberOfMatricesMDEIM == 0)
+    {
+        mdeim_fl = true;
+    }
 
     // Counter of the number of online solutions saved, accounting also time as parameter
     int counter2 = 0;
@@ -293,6 +240,8 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
 
         // residual export for hyper-reduction counter
         int counterResidual = 1;
+        int counterMatrixMDEIM = 1;
+
         // Info << " # DEBUG NonlinearReducedBurgers_central.C, line 296 # " << Nphi_u << endl;
         // Create and resize the solution vector (column vector)
         y.resize(Nphi_u, 1);
@@ -328,12 +277,12 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
         Eigen::NumericalDiff<newton_nmlspg_burgers, Eigen::Central> numDiffobject(newton_object, 1.e-05);
         Eigen::LevenbergMarquardt<decltype(numDiffobject)> lm(numDiffobject);
         // Info << " # DEBUG NonlinearReducedBurgers_central.C, line 330 # " << endl;
-        lm.parameters.factor = 100; //step bound for the diagonal shift, is this related to damping parameter, lambda?
-        lm.parameters.maxfev = 5000;//max number of function evaluations
+        lm.parameters.factor = 100;       //step bound for the diagonal shift, is this related to damping parameter, lambda?
+        lm.parameters.maxfev = 5000;      //max number of function evaluations
         lm.parameters.xtol = 1.49012e-20; //tolerance for the norm of the solution vector
         lm.parameters.ftol = 1.49012e-20; //tolerance for the norm of the vector function
-        lm.parameters.gtol = 0; // tolerance for the norm of the gradient of the error vector
-        lm.parameters.epsfcn = 0; //error precision
+        lm.parameters.gtol = 0;           // tolerance for the norm of the gradient of the error vector
+        lm.parameters.epsfcn = 0;         //error precision
 
         // Set output colors for fancy output
         Color::Modifier red(Color::FG_RED);
@@ -349,7 +298,7 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
 
             std::cout << "LM finished with status: " << ret << std::endl;
 
-            std::cout << " minimum: " << y.transpose() <<  endl;
+            std::cout << " minimum: " << y.transpose() << endl;
 
             Eigen::VectorXd res(2 * numDiffobject.embedding->output_dim);
             res.setZero();
@@ -408,6 +357,17 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
                 }
 
                 counterResidual++;
+            }
+
+            if (numberOfMatricesMDEIM > 0)
+            {
+                if (counterMatrixMDEIM == numberOfMatrixMDEIMs)
+                {
+                    matrixMDEIMList.append(numDiffobject.system_mdeim);
+                    counterMatrixMDEIM = 1;
+                }
+
+                counterMatrixMDEIM++;
             }
 
             counter++;
@@ -546,4 +506,32 @@ void NonlinearReducedBurgers::trueProjection(fileName folder)
     uRecFields = problem->L_Umodes.reconstruct(uRec, CoeffU, "uRec");
 
     ITHACAstream::exportFields(uRecFields, folder, "uTrueProjection");
+}
+
+void NonlinearReducedBurgers::OnlineSolve(Eigen::MatrixXd par_new, word Folder)
+{
+    auto t1 = std::chrono::high_resolution_clock::now();
+    auto t2 = std::chrono::high_resolution_clock::now();
+    auto time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+    time_rom = 0;
+
+    for (int i = 0; i < par_new.rows(); i++)
+    {
+        // solve
+        t1 = std::chrono::high_resolution_clock::now();
+        Eigen::MatrixXd thetaonA = DEIMmatrice->onlineCoeffsA(par_new.row(i));
+        Eigen::MatrixXd thetaonB = DEIMmatrice->onlineCoeffsB(par_new.row(i));
+        Eigen::MatrixXd A = EigenFunctions::MVproduct(ReducedMatricesA, thetaonA);
+        Eigen::VectorXd B = EigenFunctions::MVproduct(ReducedVectorsB, thetaonB);
+        Eigen::VectorXd x = A.fullPivLu().solve(B);
+        Eigen::VectorXd full = ModesTEig * x;
+        t2 = std::chrono::high_resolution_clock::now();
+        time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+        time_rom += time_span.count();
+        // Export
+        volScalarField Tred("Tred", T);
+        Tred = Foam2Eigen::Eigen2field(Tred, full);
+        ITHACAstream::exportSolution(Tred, name(i + 1), "./ITHACAoutput/" + Folder);
+        Tonline.append((Tred).clone());
+    }
 }

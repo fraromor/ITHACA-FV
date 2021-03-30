@@ -258,7 +258,7 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
     /// Set the number of parameters
     train_FOM.Pnumber = 1;
     /// Set the dimension of the training set
-    train_FOM.Tnumber = 10;
+    train_FOM.Tnumber = 20;
     /// Instantiates a void Pnumber-by-Tnumber matrix mu for the parameters and a void
     /// Pnumber-by-2 matrix mu_range for the ranges
     train_FOM.setParameters();
@@ -277,10 +277,11 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
 
     // Perform The Offline Solve;
     train_FOM.offlineSolveMach("./ITHACAoutput/Offline/Training/");
+    // ITHACAstream::read_fields(train_FOM.Ufield, "U", "./ITHACAoutput/Offline/Training/", 1);
 
     // Perform the compression of the U, rho, e fields with rSVD
-    int m{6}; // m x m frame dimension
-    int NmodesCompression{pow(2, 2 * m)};
+    int m{7}; // m x m frame dimension
+    int NmodesCompression{6400};
 
     // Perform a POD wiht rSVD decomposition for velocity
     Info << endl
@@ -288,23 +289,28 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
 
     // Get component lists
 
-    for (int i = 0; i < train_FOM.Ufield.size(); i++)
+    for (int i = 0; i < train_FOM.Ufield.size()/2; i++)
     {
         train_FOM.U0field.append(train_FOM.Ufield[i].component(0));
         train_FOM.U1field.append(train_FOM.Ufield[i].component(1));
     }
 
-    ITHACAstream::read_fields(train_FOM.U0modes, train_FOM.U0field[0].name(), "./ITHACAoutput/POD/", 1);
-    // ITHACAPOD::getModesSVD(train_FOM.U0field, train_FOM.U0modes, train_FOM.U0field[0].name(), 0, 0, 0, NmodesCompression);
+    ITHACAstream::read_fields(train_FOM.U0modes, "U.component(0)", "./ITHACAoutput/POD/", 1);
 
-    ITHACAstream::read_fields(train_FOM.U1modes, train_FOM.U1field[0].name(), "./ITHACAoutput/POD/", 1);
-    // ITHACAPOD::getModesSVD(train_FOM.U1field, train_FOM.U1modes, "U_1",0, 0, 0, NmodesCompression);
+    // auto start = std::chrono::system_clock::now();
+    // ITHACAPOD::getModesRSVD(train_FOM.U0field, train_FOM.U0modes, "U_0", 0, 0, 0, NmodesCompression);
+    // auto end = std::chrono::system_clock::now();
+    // auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    // std::cout << "Elapsed for rSVD: " << elapsed.count() << " s" << std::endl;
 
-    ITHACAstream::read_fields(train_FOM.rhomodes, "rho", "./ITHACAoutput/POD/", 1);
-    // ITHACAPOD::getModesSVD(train_FOM.rhofield, train_FOM.rhomodes, "rho",/*train_FOM.podex*/ 0, 0, 0, NmodesCompression);
+    ITHACAstream::read_fields(train_FOM.U1modes, "U.component(1)", "./ITHACAoutput/POD/", 1);
+    // ITHACAPOD::getModesRSVD(train_FOM.U1field, train_FOM.U1modes, "U_1",0, 0, 0, NmodesCompression);
 
-    ITHACAstream::read_fields(train_FOM.emodes, "e", "./ITHACAoutput/POD/", 1);
-    // ITHACAPOD::getModesSVD(train_FOM.efield, train_FOM.emodes, "e", /*train_FOM.podex*/ 0, 0, 0, NmodesCompression);
+    // ITHACAstream::read_fields(train_FOM.rhomodes, "rho", "./ITHACAoutput/POD/", 1);
+    ITHACAPOD::getModesSVD(train_FOM.rhofield, train_FOM.rhomodes, "rho",/*train_FOM.podex*/ 0, 0, 0, NmodesCompression);
+
+    // ITHACAstream::read_fields(train_FOM.emodes, "e", "./ITHACAoutput/POD/", 1);
+    ITHACAPOD::getModesSVD(train_FOM.efield, train_FOM.emodes, "e", /*train_FOM.podex*/ 0, 0, 0, NmodesCompression);
 
     torch::Tensor U0compressed;
     torch::Tensor U1compressed;
@@ -312,10 +318,10 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
     torch::Tensor ecompressed;
 
     int n_snap = train_FOM.efield.size();
-    U0compressed = train_FOM.compress(train_FOM.U0field, train_FOM.U0modes, "U_0").transpose(0, 1).reshape({n_snap, 1, pow(2, m), pow(2, m)}).contiguous();
-    U1compressed = train_FOM.compress(train_FOM.U1field, train_FOM.U1modes, "U_1").transpose(0, 1).reshape({n_snap, 1, pow(2, m), pow(2, m)}).contiguous();
-    rhocompressed = train_FOM.compress(train_FOM.rhofield, train_FOM.rhomodes, "rho").transpose(0, 1).reshape({n_snap, 1, pow(2, m), pow(2, m)}).contiguous();
-    ecompressed = train_FOM.compress(train_FOM.efield, train_FOM.emodes, "e").transpose(0, 1).reshape({n_snap, 1, pow(2, m), pow(2, m)}).contiguous();
+    U0compressed = train_FOM.compress(train_FOM.U0field, train_FOM.U0modes, "U_0").transpose(0, 1).reshape({n_snap, 1, 80, 80}).contiguous();
+    U1compressed = train_FOM.compress(train_FOM.U1field, train_FOM.U1modes, "U_1").transpose(0, 1).reshape({n_snap, 1, 80, 80}).contiguous();
+    rhocompressed = train_FOM.compress(train_FOM.rhofield, train_FOM.rhomodes, "rho").transpose(0, 1).reshape({n_snap, 1, 80, 80}).contiguous();
+    ecompressed = train_FOM.compress(train_FOM.efield, train_FOM.emodes, "e").transpose(0, 1).reshape({n_snap, 1, 80, 80}).contiguous();
 
     // torch::save(Ucompressed, "./ITHACAoutput/compressed/compressedU.pt");
     // torch::save(rhocompressed, "./ITHACAoutput/compressed/compressedrho.pt");
@@ -326,7 +332,7 @@ void train_one_parameter_initial_velocity(tutorial00 train_FOM)
     torch::Tensor tensor = torch::cat({std::move(U0compressed), std::move(U1compressed), std::move(rhocompressed), std::move(ecompressed)}, 1);
     std::cout << "Compressed tensor shape: " << tensor.sizes() << std::endl;
     torch::save(tensor, "compressedSnap.pt");
-    tensor = tensor.reshape({n_snap, 4 * pow(2, m) * pow(2, m)});
+    tensor = tensor.reshape({n_snap, 4 * 80 * 80});
     Eigen::MatrixXd tensorEig = ITHACAtorch::torch2Eigen::torchTensor2eigenMatrix<double>(tensor);
     cnpy::save(tensorEig, "compressedSnap.npy");
 }
@@ -372,7 +378,7 @@ void test_one_parameter_initial_velocity(tutorial00 test_FOM)
     Eigen::MatrixXd trueSnapMatrix = Foam2Eigen::PtrList2Eigen(test_FOM.Ufield);
     // cnpy::save(trueSnapMatrix, "npTrueSnapshots.npy");
 
-    int m{6}; // m x m frame dimension
+    int m{7}; // m x m frame dimension
     int NmodesCompression{pow(2, 2 * m)};
 
     Info << endl

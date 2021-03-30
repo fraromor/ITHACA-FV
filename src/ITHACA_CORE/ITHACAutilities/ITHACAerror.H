@@ -97,6 +97,21 @@ double errorLinfRel(GeometricField<T, fvPatchField, volMesh>& field1,
                     GeometricField<T, fvPatchField, volMesh>& field2);
 
 //--------------------------------------------------------------------------
+/// Computes the relative error in the inf norm between two lists of fields
+///
+/// @param      fields1  The reference fields to which the norm is computed
+/// @param      fields2  The fields for which the error is computed
+///
+/// @tparam     TypeField   type of field
+///
+/// @return     Column vector, in each row the inf norm of the relative error.
+///
+template<typename T>
+Eigen::MatrixXd errorLinfRel(PtrList<GeometricField<T, fvPatchField, volMesh>>&
+                             fields1,
+                             PtrList<GeometricField<T, fvPatchField, volMesh>>& fields2);
+
+//--------------------------------------------------------------------------
 /// Computes the relative error between two geometric Fields in
 /// L2 norm, given the mesh volumes field
 ///

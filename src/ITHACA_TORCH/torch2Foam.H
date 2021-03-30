@@ -77,8 +77,11 @@ torch::Tensor ptrList2Torch(PtrList<type_f>& ptrList);
 
 template <class type_f>
 PtrList<Field<type_f>> torch2PtrList(torch::Tensor& tTensor);
-}
 
+template<class type_f, template<class> class PatchField, class GeoMesh>
+PtrList<GeometricField<type_f, PatchField, GeoMesh>> torch2PtrList(torch::Tensor& tTensor, GeometricField<type_f, PatchField, GeoMesh>& field);
+
+}
 }
 
 #endif

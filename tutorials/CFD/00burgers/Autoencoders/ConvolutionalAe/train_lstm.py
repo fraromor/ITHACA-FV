@@ -25,7 +25,7 @@ def main(args):
     assert np.min(snap_vec) >= 0., "Snapshots should be clipped"
 
     n_total = snap_vec.shape[1]
-    n_train = n_total-n_total//6
+    n_train = n_total-n_total//10
 
     # scale the snapshots
     nor = Normalize(snap_vec, center_fl=True)
@@ -43,7 +43,9 @@ def main(args):
         domain_size=DOMAIN_SIZE,
         use_cuda=args.device).to(device)
 
-    model.load_state_dict(torch.load("./model_"+str(args.latent_dim)+".ckpt"))
+    checkpoint = torch.load("./model/best_model.pt")
+    model.load_state_dict(checkpoint['state_dict'])
+    # model.load_state_dict(torch.load('model_' + str(HIDDEN_DIM) + '.ckpt'))
     model.eval()
 
     # plot initial
@@ -169,8 +171,8 @@ def main(args):
                 val_list.append(val_error)
                 print('Epoch [{}/{}], Train loss: {:.12f}, Validation loss: {:.12f}'.format(epoch, args.num_epochs, loss.item(), val_error))
 
-                if val_error < 1:
-                    optimizer.param_groups[0]['lr'] = 0.0002
+                if val_error < 10 and epoch>500:
+                    optimizer.param_groups[0]['lr'] = 0.0001
 
                 if val_error < 0.1:
                     break

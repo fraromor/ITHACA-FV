@@ -10,14 +10,16 @@ from convae import *
 torch.set_default_tensor_type('torch.DoubleTensor')
 
 WM_PROJECT = "../../"
-HIDDEN_DIM = 2
+HIDDEN_DIM = 4
 DOMAIN_SIZE = 60
 DIM = 2
+
 
 # We'll ue this helper to check our models are correct.
 def test_model(model, guide, loss):
     pyro.clear_param_store()
     loss.loss(model, guide)
+
 
 class ReducedCoeffsTimeSeries(torch.nn.Module):
     def __init__(self,
@@ -31,7 +33,9 @@ class ReducedCoeffsTimeSeries(torch.nn.Module):
                                   n_layers,
                                   batch_first=True)
 
-        self.encoder = nn.Sequential(nn.Linear(hidden_dim, hidden_dim//2), nn.ELU(), nn.Linear(hidden_dim//2, output_dim))
+        self.encoder = nn.Sequential(nn.Linear(hidden_dim, hidden_dim // 2),
+                                     nn.ELU(),
+                                     nn.Linear(hidden_dim // 2, output_dim))
 
         # self.lstm.weight_hh_l0 = pyro.nn.PyroSample(pyro.distributions.Normal(loc=torch.zeros_like(self.lstm.weight_hh_l0), scale=torch.ones_like(self.lstm.weight_hh_l0)))
 
@@ -45,12 +49,15 @@ class ReducedCoeffsTimeSeries(torch.nn.Module):
         mean = self.encoder(z)
         return mean
 
+
 def bayes_model(x, y, bnnlstm, decoder):
     mean = bnnlstm(x).reshape(-1, HIDDEN_DIM)
     scale = pyro.sample("sigma", dist.Uniform(0, 0.5))
     rec_snap = decoder(mean.reshape(-1, HIDDEN_DIM))
 
-    obs = pyro.sample("obs", dist.Normal(rec_snap, scale).to_event(1), obs=y.reshape(-1, DIM*DOMAIN_SIZE**2))
+    obs = pyro.sample("obs",
+                      dist.Normal(rec_snap, scale).to_event(1),
+                      obs=y.reshape(-1, DIM * DOMAIN_SIZE**2))
 
     # print("Obs", scale.item(), "\n", z.detach().cpu().numpy()[0, :], "\n", z1.detach().cpu().numpy()[0, :],"\n", y.reshape(-1).detach().cpu().numpy()[:4])
     # z = dist.Normal(mean.reshape(-1, 4), scale).to_event(1)
@@ -63,6 +70,7 @@ def bayes_model(x, y, bnnlstm, decoder):
     # print(z.shape, z.batch_shape, z.event_shape)
     return obs
 
+
 # Device configuration
 device = torch.device('cpu')
 print("device is: ", device)
@@ -72,7 +80,7 @@ snap_vec = np.load(WM_PROJECT + "npSnapshots.npy")
 assert np.min(snap_vec) >= 0., "Snapshots should be clipped"
 
 n_total = snap_vec.shape[1]
-n_train = n_total-n_total//6
+n_train = n_total - n_total // 6
 
 # scale the snapshots
 nor = Normalize(snap_vec, center_fl=True)
@@ -83,29 +91,37 @@ print("snapshots shape", snap_scaled.shape)
 print("Min max after scaling: ", np.min(snap_scaled), np.max(snap_scaled))
 
 # load autoencoder
-ae = AE(
-    HIDDEN_DIM,
-    scale=(nor.min_sn, nor.max_sn),
-    mean=nor.mean(device),
-    domain_size=DOMAIN_SIZE).to(device)
+ae = AE(HIDDEN_DIM,
+        scale=(nor.min_sn, nor.max_sn),
+        mean=nor.mean(device),
+        domain_size=DOMAIN_SIZE).to(device)
 
-ae.load_state_dict(torch.load("./model_"+str(HIDDEN_DIM)+".ckpt"))
+ae.load_state_dict(torch.load("./model_" + str(HIDDEN_DIM) + ".ckpt"))
 ae.eval()
 
-model = ReducedCoeffsTimeSeries(
-                 input_dim=2,
-                 output_dim=HIDDEN_DIM,
-                 hidden_dim=600,
-                 n_layers=2)
+model = ReducedCoeffsTimeSeries(input_dim=2,
+                                output_dim=HIDDEN_DIM,
+                                hidden_dim=600,
+                                n_layers=2)
 
+model.load_state_dict(torch.load('lstm_'+str(HIDDEN_DIM)+'.ckpt'))
 pyro.nn.module.to_pyro_module_(model)
 
 # Now we can attempt to be fully Bayesian:
+# for m in model.modules():
+#     for name, value in list(m.named_parameters(recurse=False)):
+#         setattr(
+#             m, name,
+#             pyro.nn.PyroSample(prior=dist.Normal(0, 0.001).expand(
+#                 value.shape).to_event(value.dim())))
+
+# Prior is the deterministic lstm
 for m in model.modules():
     for name, value in list(m.named_parameters(recurse=False)):
-        setattr(m, name, pyro.nn.PyroSample(prior=dist.Normal(0, 0.001)
-                                                .expand(value.shape)
-                                                .to_event(value.dim())))
+        print("Print parameter shape: ", value.shape)
+        setattr(
+            m, name,
+            pyro.nn.PyroSample(prior=dist.Normal(value).to_event(value.dim())))
 
 print("TRACE")
 with poutine.trace() as tr:
@@ -116,7 +132,7 @@ trace.compute_log_prob()
 print(trace.format_shapes())
 
 # load training inputs
-array=[]
+array = []
 with open("../../ITHACAoutput/Offline/Training/mu_samples_mat.txt") as f:
     for i, line in enumerate(f):
         array.append([*line.split()])
@@ -156,12 +172,14 @@ n_layers = 2
 n_train = 10000
 n_train_params = 6
 n_time_samples = 2001
-val_list=[]
+val_list = []
 
 # dataloader
-x = torch.from_numpy(x.reshape(n_train_params, n_time_samples, x.shape[1])).to(torch.device("cpu"))
+x = torch.from_numpy(x.reshape(n_train_params, n_time_samples,
+                               x.shape[1])).to(torch.device("cpu"))
 output = nor.vectorize2d(snap_torch).reshape(6, 2001, 7200)
-validation = nl_red_coeff.reshape(n_train_params, n_time_samples, HIDDEN_DIM).to(torch.device("cpu"))
+validation = nl_red_coeff.reshape(n_train_params, n_time_samples,
+                                  HIDDEN_DIM).to(torch.device("cpu"))
 
 # fig, axes = plt.subplots(4, 4, figsize=(10, 10))
 # for i in range(4):
@@ -172,24 +190,30 @@ validation = nl_red_coeff.reshape(n_train_params, n_time_samples, HIDDEN_DIM).to
 val_input = x[4, :, :].unsqueeze(0).to(torch.device("cpu"))
 x = torch.cat([x[:4, :, :], x[5:, :, :]]).to(torch.device("cpu"))
 
-val_output  = validation[4, :, :].unsqueeze(0).to(torch.device("cpu"))
-output = torch.cat([output[:4, :, :], output[5:, :, :]]).to(torch.device("cpu"))
+val_output = validation[4, :, :].unsqueeze(0).to(torch.device("cpu"))
+output = torch.cat([output[:4, :, :],
+                    output[5:, :, :]]).to(torch.device("cpu"))
 
 print("train in out:", x.shape, output.shape)
 print("test in out:", val_input.shape, val_output.shape)
 
 for j in range(num_iterations):
     # calculate the loss and take a gradient step
-    loss = svi.step(x.to(torch.device("cpu")), output.to(torch.device("cpu")), model, ae.decoder)
+    loss = svi.step(x.to(torch.device("cpu")), output.to(torch.device("cpu")),
+                    model, ae.decoder)
 
     if j % 2 == 0:
-        guide_trace = poutine.trace(guide).get_trace(val_input[:].to(torch.device("cpu")))
-        val_forwarded = poutine.replay(model, guide_trace)(val_input[:].to(torch.device("cpu")))
+        guide_trace = poutine.trace(guide).get_trace(val_input[:].to(
+            torch.device("cpu")))
+        val_forwarded = poutine.replay(model, guide_trace)(val_input[:].to(
+            torch.device("cpu")))
         # val_forwarded = guide(val_input[:])
         # print("guide", val_forwarded.shape)
-        val_error = np.max(np.abs((val_forwarded.reshape(-1).detach().cpu().numpy
-        ()-val_output.reshape(-1).detach().cpu().numpy())))
+        val_error = np.max(
+            np.abs((val_forwarded.reshape(-1).detach().cpu().numpy() -
+                    val_output.reshape(-1).detach().cpu().numpy())))
         val_list.append(val_error)
         # print("Obs\n", val_forwarded.reshape(-1).detach().cpu().numpy
         # ()[:4], "\n", val_output.reshape(-1).detach().cpu().numpy()[:4])
-        print("[iteration %04d] loss: %.4f Validation loss: %.12f" % (j + 1, loss / (2001*5), val_error))
+        print("[iteration %04d] loss: %.4f Validation loss: %.12f" %
+              (j + 1, loss / (2001 * 5), val_error))

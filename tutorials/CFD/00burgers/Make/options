@@ -38,6 +38,7 @@ EXE_INC = \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/Containers \
     -I$(LIB_ITHACA_SRC)/thirdparty/Eigen \
     -I$(LIB_ITHACA_SRC)/thirdparty/spectra/include \
+    -I$(LIB_ITHACA_SRC)/thirdparty/redsvd \
     -I$(LIB_ITHACA_SRC)/ITHACA_THIRD_PARTY/splinter/include \
     -I$(LIB_ITHACA_SRC)/ITHACA_TORCH \
     -I$(LIB_ITHACA_SRC)/ITHACA_TORCH/torch2Foam \
