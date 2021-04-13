@@ -13,7 +13,7 @@
 #ifndef EIGEN_NUMERICAL_DIFF_H
 #define EIGEN_NUMERICAL_DIFF_H
 
-namespace Eigen { 
+namespace Eigen {
 
 enum NumericalDiffMode {
     Forward,
@@ -22,7 +22,7 @@ enum NumericalDiffMode {
 
 
 /**
-  * This class allows you to add a method df() to your functor, which will 
+  * This class allows you to add a method df() to your functor, which will
   * use numerical differentiation to compute an approximate of the
   * derivative for the functor. Of course, if you have an analytical form
   * for the derivative, you should rather implement df() by yourself.
@@ -91,6 +91,7 @@ public:
 
         // Function Body
         for (int j = 0; j < n; ++j) {
+            // Info << " # DEBUG NumericalDiff.h, line 94 # " << endl;
             h = eps * abs(x[j]);
             if (h == 0.) {
                 h = eps;
@@ -106,15 +107,20 @@ public:
                 case Central:
                     x[j] += h;
                     Functor::operator()(x, val2); nfev++;
+                    // Info << " # DEBUG NumericalDiff.h, line 110 # " << endl;
                     x[j] -= 2*h;
                     Functor::operator()(x, val1); nfev++;
+                    // Info << " # DEBUG NumericalDiff.h, line 113 # " << endl;
                     x[j] = _x[j];
+                    // Info << " # DEBUG NumericalDiff.h, line 115 # " << endl;
                     jac.col(j) = (val2-val1)/(2*h);
+                    // Info << " # DEBUG NumericalDiff.h, line 114 # " << endl;
                     break;
                 default:
                     eigen_assert(false);
             };
         }
+        // Info << " # DEBUG NumericalDiff.h, line 119 # " << endl;
         return nfev;
     }
 private:

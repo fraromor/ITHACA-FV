@@ -28,6 +28,9 @@ Description
 SourceFiles
     DEIM.C
 \*---------------------------------------------------------------------------*/
+#ifndef DEIM_H
+#define DEIM_H
+
 #include "fvCFD.H"
 #include "ITHACAPOD.H"
 #include "Foam2Eigen.H"
@@ -254,3 +257,4 @@ class DEIM
 
 };
 
+#endif

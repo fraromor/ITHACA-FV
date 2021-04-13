@@ -97,6 +97,13 @@ initial latent variable shape :  [[ 92.20896149  63.95618057  40.81492615 -33.28
 DIM = 2
 DOMAIN_SIZE = 60
 
+class DeimSurrogate(nn.Module):
+    def __init__(self, inp, hidden, out):
+        super().__init__()
+        self.layer = nn.Sequential(nn.Linear(inp, hidden), nn.ReLU(), nn.Linear(hidden, out), nn.ReLU())
+
+    def forward(self, x):
+        return self.layer(x)
 
 class AE(nn.Module):
     def __init__(self,

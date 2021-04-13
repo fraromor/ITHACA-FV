@@ -56,6 +56,7 @@ SourceFiles
 #include "IPstream.H"
 #include "OPstream.H"
 #include "Modes.H"
+#include "DEIM.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -144,6 +145,18 @@ class Burgers: public reductionProblem
         /// Viscosity
         autoPtr<dimensionedScalar> _nu;//CHECK
 
+        ///MDEIM and DEIM
+        DEIM<fvVectorMatrix>* DEIMmatrice;
+
+        // MDEIM and DEIM dimensions
+        int NmodesDEIMA;
+        int NmodesDEIMB;
+
+        /// Parameter to pass for MDEIM reduction
+        int exportDEIMEvery;
+
+        /// List of fvVectorMatrices for MDEIM and DEIM
+        PtrList<fvVectorMatrix> deimList;
 
         /// Mesh
         mutable autoPtr<fvMesh> _mesh;
@@ -322,6 +335,7 @@ class Burgers: public reductionProblem
         bool checkWrite(Time& timeObject);
 
         void evaluateMatrices();
+        void performMDEIM(int NmodesDEIMA, int NmodesDEIMB);
 
 };
 

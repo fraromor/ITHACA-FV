@@ -877,7 +877,7 @@ std::tuple<List<Eigen::SparseMatrix<double>>, List<Eigen::VectorXd>>
     ITHACAparameters* para(ITHACAparameters::getInstance());
     List<Eigen::SparseMatrix<double>> ModesA(nmodesA);
     List<Eigen::VectorXd> ModesB(nmodesB);
-
+    Info << " # DEBUG ITHACAPOD.C, line 880 # " << nmodesB << " " << nmodesA << endl;
     if (!ITHACAutilities::check_folder("./ITHACAoutput/DEIM/" + MatrixName))
     {
         if (nmodesA > A.size() - 2 || nmodesB > A.size() - 2 )
@@ -897,14 +897,17 @@ std::tuple<List<Eigen::SparseMatrix<double>>, List<Eigen::VectorXd>>
 
         for (label i = 0; i < nmodesA; i++)
         {
+            Info << " # DEBUG ITHACAPOD.C, line 900 # " << nmodesA << endl;
             eigenVectorA[i].setSize(A.size());
         }
 
         for (label i = 0; i < nmodesB; i++)
         {
+            Info << " # DEBUG ITHACAPOD.C, line 906 # " << nmodesB << endl;
             eigenVectorB[i].setSize(A.size());
         }
 
+        Info << " # DEBUG ITHACAPOD.C, line 908 # " << endl;
         Eigen::MatrixXd corMatrixA = corMatrix(A);
         Eigen::MatrixXd corMatrixB = corMatrix(b);
         Info << "####### Performing the POD for the Matrix List #######" << endl;
@@ -1260,13 +1263,17 @@ std::tuple<List<Eigen::SparseMatrix<double>>, List<Eigen::VectorXd>>
 
     if (!ITHACAutilities::check_folder("./ITHACAoutput/DEIM/" + MatrixName))
     {
+        Info << " # DEBUG ITHACAPOD.C, line 1266 # " << MatrixList.size() << " " << nmodesA << " " << nmodesB << endl;
         M_Assert(nmodesA <= MatrixList.size() - 2
                  && nmodesB <= MatrixList.size() - 2,
                  "The number of requested modes cannot be bigger than the number of Snapshots - 2");
         std::tuple<List<Eigen::SparseMatrix<double>>, List<Eigen::VectorXd>> snapshots =
                     Foam2Eigen::LFvMatrix2LSM(MatrixList);
+                    Info << " # DEBUG ITHACAPOD.C, line 1272 # " << endl;
         Eigen::MatrixXd corMatrixA = corMatrix(std::get<0>(snapshots));
+        Info << " # DEBUG ITHACAPOD.C, line 1274 # " << endl;
         Eigen::MatrixXd corMatrixB = corMatrix(std::get<1>(snapshots));
+        Info << " # DEBUG ITHACAPOD.C, line 1276 # " << endl;
         Eigen::VectorXd eigenValueseigA;
         Eigen::MatrixXd eigenVectorseigA;
         Eigen::VectorXd eigenValueseigB;
@@ -1540,13 +1547,14 @@ PtrList<GeometricField<Type, fvPatchField, volMesh>> DEIMmodes(
         Info << "####### Saving the POD bases for " << SnapShotsMatrix[0].name() <<
              " #######" << endl;
         ITHACAutilities::createSymLink("./ITHACAoutput/DEIM");
-
+        Info << " # DEBUG ITHACAPOD.C, line 1543 # " << endl;
         for (label i = 0; i < modes.size(); i++)
         {
+            Info << " # DEBUG ITHACAPOD.C, line 1546 # " << endl;
             ITHACAstream::exportSolution(modes[i], name(i + 1), "./ITHACAoutput/DEIM",
                                          modes[i].name());
         }
-
+        Info << " # DEBUG ITHACAPOD.C, line 1549 # " << endl;
         ITHACAstream::exportList(eigenValues, "./ITHACAoutput/DEIM/",
                                  "eigenValues_" + SnapShotsMatrix[0].name());
         ITHACAstream::exportList(cumEigenValues, "./ITHACAoutput/DEIM/",
@@ -1555,7 +1563,9 @@ PtrList<GeometricField<Type, fvPatchField, volMesh>> DEIMmodes(
     else
     {
         Info << "Reading the existing modes" << endl;
+        Info << " # DEBUG ITHACAPOD.C, line 1559 # " << endl;
         ITHACAstream::read_fields(modes, FieldName, "./ITHACAoutput/DEIM/");
+        Info << " # DEBUG ITHACAPOD.C, line 1561 # " << endl;
     }
 
     return modes;

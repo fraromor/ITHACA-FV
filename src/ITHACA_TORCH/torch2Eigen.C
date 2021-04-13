@@ -91,8 +91,10 @@ Eigen::Matrix<type, Eigen::Dynamic, Eigen::Dynamic> torchTensor2eigenMatrix(
         raw[i] = a;
     }
 
+    // std::cout << " # DEBUG torch2Eigen.C, line 94 # " << rows << " " << cols << std::endl;
     Eigen::Map<MatrixXf_rm> eigenMatrix(&raw[0], rows,
                                         cols);
+    // std::cout << " # DEBUG torch2Eigen.C, line 97 # " << std::endl;
     return eigenMatrix;
 }
 

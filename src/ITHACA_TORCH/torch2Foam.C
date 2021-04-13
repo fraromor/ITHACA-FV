@@ -130,23 +130,23 @@ PtrList<Field<type_f>> torch2PtrList(torch::Tensor& tTensor)
 template PtrList<Field<scalar>> torch2PtrList<scalar>(torch::Tensor& tTensor);
 template PtrList<Field<vector>> torch2PtrList<vector>(torch::Tensor& tTensor);
 
-template<class type_f, template<class> class PatchField, class GeoMesh>
-PtrList<GeometricField<type_f, PatchField, GeoMesh>> torch2PtrList(torch::Tensor& tTensor, GeometricField<type_f, PatchField, GeoMesh>& field)
-{
-    PtrList<GeometricField<type_f, PatchField, GeoMesh>> out;
+// template<class type_f, template<class> class PatchField, class GeoMesh>
+// PtrList<GeometricField<type_f, PatchField, GeoMesh>> torch2PtrList(torch::Tensor& tTensor, GeometricField<type_f, PatchField, GeoMesh>& field)
+// {
+//     PtrList<GeometricField<type_f, PatchField, GeoMesh>> out;
 
-    for (auto i = 0; i < tTensor.size(0); i++)
-    {
-        torch::Tensor t = tTensor.slice(0, i, i + 1);
-        field.internalField() = torch2Field<type_f>(t);
-        out.append(field);
-    }
+//     for (auto i = 0; i < tTensor.size(0); i++)
+//     {
+//         torch::Tensor t = tTensor.slice(0, i, i + 1);
+//         field.internalField() = torch2Field<type_f>(t);
+//         out.append(field);
+//     }
 
-    return out;
-}
+//     return out;
+// }
 
-template PtrList<GeometricField<scalar, PatchField, GeoMesh>> torch2PtrList<scalar>(torch::Tensor& tTensor, GeometricField<scalar, PatchField, GeoMesh>& field);
-template PtrList<GeometricField<vector, PatchField, GeoMesh>> torch2PtrList<vector>(torch::Tensor& tTensor, GeometricField<vector, PatchField, GeoMesh>& field);
+// template PtrList<GeometricField<scalar, PatchField, GeoMesh>> torch2PtrList<scalar>(torch::Tensor& tTensor, GeometricField<scalar, PatchField, GeoMesh>& field);
+// template PtrList<GeometricField<vector, PatchField, GeoMesh>> torch2PtrList<vector>(torch::Tensor& tTensor, GeometricField<vector, PatchField, GeoMesh>& field);
 
 
 

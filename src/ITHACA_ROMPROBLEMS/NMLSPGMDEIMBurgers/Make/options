@@ -93,6 +93,7 @@ EXE_LIBS = \
     -lfileFormats \
     -lcompressibleLESModels \
     -lburgers \
+    -lburgersNonlinearReduced \
     -lITHACA_TORCH \
     -Wl,-rpath,$(TORCH_LIBRARIES)/lib $(TORCH_LIBRARIES)/lib/libtorch.so $(TORCH_LIBRARIES)/lib/libc10.so \
     -Wl,--no-as-needed,$(TORCH_LIBRARIES)/lib/libcaffe2_detectron_ops.so \

@@ -428,6 +428,7 @@ void Foam2Eigen::fvMatrix2Eigen(fvMatrix<scalar> foam_matrix,
                                 Eigen::MatrixXd& A,
                                 Eigen::VectorXd& b)
 {
+    // Info << " # DEBUG Foam2Eigen.C, line 431 # " << endl;
     label sizeA = foam_matrix.diag().size();
     A.setZero(sizeA, sizeA);
     b.setZero(sizeA);
@@ -437,7 +438,6 @@ void Foam2Eigen::fvMatrix2Eigen(fvMatrix<scalar> foam_matrix,
         A(i, i) = foam_matrix.diag()[i];
         b(i, 0) = foam_matrix.source()[i];
     }
-
     const lduAddressing& addr = foam_matrix.lduAddr();
     const labelList& lowerAddr = addr.lowerAddr();
     const labelList& upperAddr = addr.upperAddr();
@@ -464,6 +464,7 @@ void Foam2Eigen::fvMatrix2Eigen(fvMatrix<vector> foam_matrix,
                                 Eigen::MatrixXd& A,
                                 Eigen::VectorXd& b)
 {
+    // Info << " # DEBUG Foam2Eigen.C, line 467 # " << endl;
     label sizeA = foam_matrix.diag().size();
     A.resize(sizeA * 3, sizeA * 3);
     b.resize(sizeA * 3);
@@ -477,6 +478,7 @@ void Foam2Eigen::fvMatrix2Eigen(fvMatrix<vector> foam_matrix,
         b(sizeA + i) = foam_matrix.source()[i][1];
         b(2 * sizeA + i) = foam_matrix.source()[i][2];
     }
+    // Info << " # DEBUG Foam2Eigen.C, line 480 # " << endl;
 
     const lduAddressing& addr = foam_matrix.lduAddr();
     const labelList& lowerAddr = addr.lowerAddr();
@@ -510,6 +512,7 @@ template<>
 void Foam2Eigen::fvMatrix2Eigen(fvMatrix<scalar> foam_matrix,
                                 Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b)
 {
+    // Info << " # DEBUG Foam2Eigen.C, line 515 # " << endl;
     label sizeA = foam_matrix.diag().size();
     label nel = foam_matrix.diag().size() + foam_matrix.upper().size() +
                 foam_matrix.lower().size();
@@ -551,9 +554,11 @@ template<>
 void Foam2Eigen::fvMatrix2Eigen(fvMatrix<vector> foam_matrix,
                                 Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b)
 {
+    // Info << " # DEBUG Foam2Eigen.C, line 557 # " << endl;
     label sizeA = foam_matrix.diag().size();
     label nel = foam_matrix.diag().size() + foam_matrix.upper().size() +
                 foam_matrix.lower().size();
+    // Info << " # DEBUG Foam2Eigen.C, line 557z # " << endl;
     A.resize(sizeA * 3, sizeA * 3);
     A.reserve(nel * 3);
     b.resize(sizeA * 3);
@@ -571,10 +576,11 @@ void Foam2Eigen::fvMatrix2Eigen(fvMatrix<vector> foam_matrix,
         b(sizeA + i) = foam_matrix.source()[i][1];
         b(2 * sizeA + i) = foam_matrix.source()[i][2];
     }
-
+    // Info << " # DEBUG Foam2Eigen.C, line 580 # " << endl;
     const lduAddressing& addr = foam_matrix.lduAddr();
     const labelList& lowerAddr = addr.lowerAddr();
     const labelList& upperAddr = addr.upperAddr();
+    // Info << " # DEBUG Foam2Eigen.C, line 583 # " << endl;
     forAll(lowerAddr, i)
     {
         tripletList.push_back(Trip(lowerAddr[i], upperAddr[i], foam_matrix.upper()[i]));
@@ -588,6 +594,7 @@ void Foam2Eigen::fvMatrix2Eigen(fvMatrix<vector> foam_matrix,
         tripletList.push_back(Trip(upperAddr[i] + sizeA * 2, lowerAddr[i] + sizeA * 2,
                                    foam_matrix.lower()[i]));
     }
+    // Info << " # DEBUG Foam2Eigen.C, line 596 # " << endl;
     forAll(foam_matrix.psi().boundaryField(), I)
     {
         const fvPatch& ptch = foam_matrix.psi().boundaryField()[I].patch();
@@ -604,6 +611,7 @@ void Foam2Eigen::fvMatrix2Eigen(fvMatrix<vector> foam_matrix,
             b(w + sizeA * 2)   += foam_matrix.boundaryCoeffs()[I][J][2];
         }
     }
+    // Info << " # DEBUG Foam2Eigen.C, line 613 # " << endl;
     A.setFromTriplets(tripletList.begin(), tripletList.end());
 }
 
@@ -936,11 +944,14 @@ std::tuple<List<Eigen::SparseMatrix<double>>, List<Eigen::VectorXd>>
 
     for (label j = 0; j < LSize; j++)
     {
+        // Info << " # DEBUG Foam2Eigen.C, line 939 # " << j << "/" << LSize << endl;
         fvMatrix2Eigen(MatrixList[j], A, b);
+        // Info << " # DEBUG Foam2Eigen.C, line 941 # " << endl;
         SM_list[j] = A;
         V_list[j] = b;
+        // Info << " # DEBUG Foam2Eigen.C, line 944 # " << endl;
     }
-
+    // Info << " # DEBUG Foam2Eigen.C, line 944 # " << endl;
     std::tuple <List<Eigen::SparseMatrix<double>>, List<Eigen::VectorXd>> tupla;
     tupla = std::make_tuple(SM_list, V_list);
     return tupla;

@@ -34,6 +34,8 @@
 
 #include "burgers.H"
 #include <chrono>
+#include <set>
+#include <algorithm>
 
 // * * * * * * * * * * * * * * * Constructors * * * * * * * * * * * * * * * * //
 // Constructor
@@ -78,9 +80,11 @@ Burgers::Burgers(int argc, char* argv[])
     // bcMethod = ITHACAdict->lookupOrDefault<word>("bcMethod", "lift");
     // M_Assert(bcMethod == "lift" || bcMethod == "penalty",
     //          "The BC method must be set to lift or penalty in ITHACAdict");
+    NUmodes = ITHACAdict->lookupOrDefault<int>("NUmodes", 10);
     para = ITHACAparameters::getInstance(mesh, runTime);
     offline = ITHACAutilities::check_off();
     podex = ITHACAutilities::check_pod();
+    Info << " # DEBUG burgers.C, line 85 # " << endl;
 }
 
 // * * * * * * * * * * * * * * Full Order Methods * * * * * * * * * * * * * * //
@@ -112,7 +116,17 @@ void Burgers::truthSolve(List<scalar> mu_now, fileName folder)
     Ufield.append(U);
     counter++;
     int write_counter{0};
+    int MDEIM_counter{0};
     nextWrite += writeEvery;
+
+    // Init fvVectorMatrix to save modes for MDEIm
+    fvVectorMatrix UEqn
+    (
+        fvm::ddt(U)
+        + 0.5*fvm::div(phi, U)
+        ==
+        fvm::laplacian(nu, U)
+    );
 
     // Save also the couple (initialTime, mu_now)
     mu_samples.conservativeResize(mu_samples.rows() + 1, mu_now.size() + 1);
@@ -137,15 +151,27 @@ void Burgers::truthSolve(List<scalar> mu_now, fileName folder)
             Info<< "Time = " << runTime.timeName() << nl << " size " << Ufield.size() << endl;
 
             auto start = std::chrono::system_clock::now();
+
             while (simple.correctNonOrthogonal())//CHECK
             {
-#include "UEqn.H"
+                UEqn = fvVectorMatrix
+                (
+                    fvm::ddt(U)
+                    + 0.5*fvm::div(phi, U)
+                    ==
+                    fvm::laplacian(nu, U)
+                );
+                UEqn.solve();
+                phi = linearInterpolate(U) & mesh.Sf();
+                //TODO init an autoPtr with UEqn
+
             }
             auto end = std::chrono::system_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
             Info<< "Elapsed = " << elapsed.count() << " mus" << endl;
 
             write_counter++;
+            MDEIM_counter++;
 
             if (write_counter >= writeEvery)
             {
@@ -159,11 +185,18 @@ void Burgers::truthSolve(List<scalar> mu_now, fileName folder)
                 mu_samples.conservativeResize(mu_samples.rows() + 1, mu_now.size() + 1);
                 mu_samples(mu_samples.rows() - 1, 0) = atof(runTime.timeName().c_str());
 
-            for (label i = 0; i < mu_now.size(); i++)
+                for (label i = 0; i < mu_now.size(); i++)
                 {
                     mu_samples(mu_samples.rows() - 1, i + 1) = mu_now[i];
                 }
                 write_counter = 0;
+            }
+
+            if (exportDEIMEvery > 0 && MDEIM_counter >= exportDEIMEvery)
+            {
+                deimList.append((UEqn).clone());
+                Info << " # DEBUG burgers.C, line 196 # " << MDEIM_counter << " " << counter << endl;
+                MDEIM_counter = 0;
             }
         }
 
@@ -178,16 +211,115 @@ void Burgers::truthSolve(List<scalar> mu_now, fileName folder)
         mu.resize(1, 1);
     }
 
-    Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_FOMPROBLEMS/burgers/burgers.C, line 176 #################### " << mu_samples.rows() << " " << counter << " " << mu.cols() << endl;
-    // counter+1 because also the initial time was saved
-    if (mu_samples.rows() == counter * mu.cols())
-    {
-        Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_FOMPROBLEMS/burgers/burgers.C, line 183 #################### " << endl;
-        ITHACAstream::exportMatrix(mu_samples, "mu_samples", "eigen",
-                                   folder);
-    }
+    // Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_FOMPROBLEMS/burgers/burgers.C, line 176 #################### " << mu_samples.rows() << " " << counter << " " << mu.cols() << endl;
+    // // counter+1 because also the initial time was saved
+    // if (mu_samples.rows() == counter * mu.cols())
+    // {
+    //     Info << " #################### DEBUG ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/src/ITHACA_FOMPROBLEMS/burgers/burgers.C, line 183 #################### " << endl;
+    //     ITHACAstream::exportMatrix(mu_samples, "mu_samples", "eigen",
+    //                                folder);
+    // }
     ITHACAstream::exportMatrix(mu_samples, "mu_samples", "eigen",
                                    folder);
+
+}
+
+void Burgers::performMDEIM(int NmodesDEIMA, int NmodesDEIMB)
+{
+    Info << " # DEBUG burgers.C, line 225 # " << deimList.size() <<  endl;
+    DEIMmatrice = new DEIM<fvVectorMatrix>(deimList, NmodesDEIMA, NmodesDEIMB, "U_burgers");
+    Info << " # DEBUG burgers.C, line 227 # " << endl;
+    fvMesh &mesh = const_cast<fvMesh &>(L_Umodes[0].mesh());
+    // Differential Operator
+    auto fieldA = DEIMmatrice->generateSubmeshesMatrix(2, mesh, L_Umodes[0]);
+    // Source Terms
+    auto fieldB = DEIMmatrice->generateSubmeshesVector(2, mesh, L_Umodes[0]);
+
+
+    // Export Indices in submeshes order
+    int total_mp = 0;
+    for (int i = 0; i < DEIMmatrice->submeshListA.size(); i++)
+    {
+        total_mp+=DEIMmatrice->submeshListA[i].cellMap().size();
+    }
+    for (int i = 0; i < DEIMmatrice->submeshListB.size(); i++)
+    {
+        total_mp+=DEIMmatrice->submeshListB[i].cellMap().size();
+    }
+
+    Eigen::VectorXd indices_mdeim;
+    indices_mdeim.resize(total_mp);
+    int idx{0};
+    int ind;
+    int index_mesh;
+    std::vector<int> setMagicPointsAB(DEIMmatrice->submeshListB.size()+DEIMmatrice->submeshListA.size());
+    Eigen::VectorXd vec_ind;
+    vec_ind.resize(DEIMmatrice->submeshListB.size());
+
+    for (int i = 0; i < DEIMmatrice->submeshListA.size(); i++)
+    {
+        Info << " # DEBUG burgers.C, line 253 # " << DEIMmatrice->submeshListA[i].cellMap().size() << endl;
+        ind = DEIMmatrice->localMagicPointsA[i].second() + DEIMmatrice->xyz_A[i].second() * DEIMmatrice->submeshListA[i].cellMap().size();
+        index_mesh = DEIMmatrice->submeshListA[i].cellMap()[ind];
+        setMagicPointsAB[i]=index_mesh;
+
+        for (int j = 0; j < DEIMmatrice->submeshListA[i].cellMap().size(); j++)
+        {
+            indices_mdeim(idx) = DEIMmatrice->submeshListA[i].cellMap()[j];
+            Info << " # DEBUG burgers.C, line 257 # " << DEIMmatrice->submeshListA[i].cellMap()[j] << endl;
+            idx++;
+        }
+
+    }
+    for (int i = 0; i < DEIMmatrice->submeshListB.size(); i++)
+    {
+        Info << " # DEBUG burgers.C, line 262 # " << DEIMmatrice->submeshListB[i].cellMap().size() << endl;
+        ind = DEIMmatrice->localMagicPointsB[i] + DEIMmatrice->xyz_B[i] * DEIMmatrice->submeshListB[i].cellMap().size();
+        index_mesh = DEIMmatrice->submeshListB[i].cellMap()[ind];
+        if (std::any_of(setMagicPointsAB.begin(), setMagicPointsAB.end(), [&](int i){return i==index_mesh;}))
+        {
+            setMagicPointsAB[i + DEIMmatrice->submeshListA.size()]=index_mesh;
+            vec_ind(i)=1;
+            for (int j = 0; j < DEIMmatrice->submeshListB[i].cellMap().size(); j++)
+            {
+                indices_mdeim(idx) = DEIMmatrice->submeshListB[i].cellMap()[j];
+                Info << " # DEBUG burgers.C, line 267 # " << DEIMmatrice->submeshListB[i].cellMap()[j] << endl;
+                idx++;
+            }
+        }
+        else
+        {
+            setMagicPointsAB[i + DEIMmatrice->submeshListA.size()]=-index_mesh;
+            vec_ind(i)=0;
+            for (int j = 0; j < DEIMmatrice->submeshListB[i].cellMap().size(); j++)
+            {
+                indices_mdeim(idx) = -1;
+                Info << " # DEBUG burgers.C, line 267 # " << DEIMmatrice->submeshListB[i].cellMap()[j] << endl;
+                idx++;
+            }
+        }
+    }
+
+    std::cout << "DEIM finished, n_indices is: " << idx << std::endl;
+    cnpy::save(indices_mdeim, "indices.npy");
+
+    std::cout << "Non duplicated magic points: " << std::count_if(setMagicPointsAB.begin(), setMagicPointsAB.end(), [](int i){return i>0;}) << " / " << DEIMmatrice->submeshListB.size()+DEIMmatrice->submeshListA.size() << std::endl;
+
+    //TODO use iterators
+    Eigen::VectorXd vec;
+    vec.resize(setMagicPointsAB.size());
+    int i = 0;
+    for (auto x: setMagicPointsAB)
+    {
+        vec(i) = x;
+        i++;
+    }
+
+    std::cout << "MP vector: " << vec << std::endl;
+    cnpy::save(vec, "magicPoints.npy");
+
+    std::cout << "vec ind B: " << vec_ind.transpose() << std::endl;
+    cnpy::save(vec_ind, "vecIndB.npy");
 }
 
 // Method to compute the lifting function

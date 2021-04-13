@@ -5,7 +5,6 @@
      ██║   ██║   ██╔══██║██╔══██║██║     ██╔══██║╚════╝██╔══╝  ╚██╗ ██╔╝
      ██║   ██║   ██║  ██║██║  ██║╚██████╗██║  ██║      ██║      ╚████╔╝
      ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝      ╚═╝       ╚═══╝
-
  * In real Time Highly Advanced Computational Applications for Finite Volumes
  * Copyright (C) 2017 by the ITHACA-FV authors
 -------------------------------------------------------------------------------
@@ -71,19 +70,30 @@ class DEIM_function : public DEIM<fvScalarMatrix>
         Eigen::MatrixXd onlineCoeffsA(Eigen::MatrixXd mu)
         {
             Eigen::MatrixXd theta(fieldsA.size(), 1);
+            std::cout << "START" << std::endl;
 
             for (int i = 0; i < fieldsA.size(); i++)
             {
                 Eigen::SparseMatrix<double> Mr;
                 Eigen::VectorXd br;
                 fvScalarMatrix Aof = evaluate_expression(fieldsA[i], mu);
+                // std::cout << "here " << fieldsA.size() << " " << fieldsB.size() << std::endl;
+                std::cout << "dimsA: " << fieldsA[i].size() << std::endl;
+                // std::cout << "localA: " << magicPointsA.size() << std::endl;
                 Foam2Eigen::fvMatrix2Eigen(Aof, Mr, br);
+                std::cout << "row: "<< localMagicPointsA[i].first() << " " <<  xyz_A[i].first() << " " <<
+                              fieldsA[i].size() << std::endl;
+                std::cout << "col: "<< localMagicPointsA[i].second() << " " <<  xyz_A[i].second() << " " <<
+                              fieldsA[i].size() << std::endl;
                 int ind_row = localMagicPointsA[i].first() + xyz_A[i].first() *
                               fieldsA[i].size();
                 int ind_col = localMagicPointsA[i].second() + xyz_A[i].second() *
                               fieldsA[i].size();
+                std::cout <<"row col: " << ind_row << " " << ind_col << std::endl;
+                std::cout << "cells coorA: " << submeshListA[i].cellMap()[0] << std::endl;
                 theta(i) = Mr.coeffRef(ind_row, ind_col);
             }
+            std::cout << "END" << std::endl;
 
             return theta;
         }
@@ -91,14 +101,15 @@ class DEIM_function : public DEIM<fvScalarMatrix>
         Eigen::MatrixXd onlineCoeffsB(Eigen::MatrixXd mu)
         {
             Eigen::MatrixXd theta(fieldsB.size(), 1);
-
             for (int i = 0; i < fieldsB.size(); i++)
             {
                 Eigen::SparseMatrix<double> Mr;
                 Eigen::VectorXd br;
+                std::cout << "dimsB: " << fieldsB[i].size() << std::endl;
                 fvScalarMatrix Aof = evaluate_expression(fieldsB[i], mu);
                 Foam2Eigen::fvMatrix2Eigen(Aof, Mr, br);
                 int ind_row = localMagicPointsB[i] + xyz_B[i] * fieldsB[i].size();
+                std::cout << "cells coorB: " << submeshListB[i].cellMap()[0] << std::endl;
                 theta(i) = br(ind_row);
             }
 
@@ -201,9 +212,11 @@ class DEIMLaplacian: public laplacianProblem
 
         void PODDEIM(int NmodesT, int NmodesDEIMA, int NmodesDEIMB)
         {
+            Info << " # DEBUG 09DEIM_ROM.C, line 203 # " << endl;
             DEIMmatrice = new DEIM_function(Mlist, NmodesDEIMA, NmodesDEIMB, "T_matrix");
             fvMesh& mesh  =  const_cast<fvMesh&>(T.mesh());
             // Differential Operator
+            Info << " # DEBUG 09DEIM_ROM.C, line 207 # " << endl;
             DEIMmatrice->fieldsA = DEIMmatrice->generateSubmeshesMatrix(2, mesh, T);
             // Source Terms
             DEIMmatrice->fieldsB = DEIMmatrice->generateSubmeshesVector(2, mesh, T);
@@ -266,10 +279,13 @@ int main(int argc, char* argv[])
     // Solve the offline problem to compute the snapshots for the projections
     example.OfflineSolve(example.mu, "Offline");
     // Compute the POD modes
+    Info << " # DEBUG 09DEIM_ROM.C, line 268 # " << endl;
     ITHACAPOD::getModes(example.Tfield, example.Tmodes, example._T().name(),
                         example.podex, 0, 0, 20);
+    Info << " # DEBUG 09DEIM_ROM.C, line 271 # " << endl;
     // Compute the offline part of the DEIM procedure
     example.PODDEIM();
+    Info << " # DEBUG 09DEIM_ROM.C, line 274 # " << endl;
     // Construct a new set of parameters
     Eigen::MatrixXd par_new1 = ITHACAutilities::rand(100, 2, -0.5, 0.5);
     // Solve the online problem with the new parameters
@@ -329,5 +345,4 @@ int main(int argc, char* argv[])
 /// \section plaincode The plain program
 /// Here there's the plain code
 ///
-
 

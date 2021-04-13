@@ -12,10 +12,11 @@ EXE_INC = \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/Foam2Eigen \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/EigenFunctions \
     -I$(LIB_ITHACA_SRC)/ITHACA_CORE/Containers \
+    -I$(LIB_ITHACA_SRC)/thirdparty/redsvd \
     -Wno-comment \
     -w \
     -DOFVER=$${WM_PROJECT_VERSION%.*} \
-    -std=c++11 
+    -std=c++11
 
 
 
@@ -25,4 +26,4 @@ EXE_LIBS = \
     -lsampling \
     -lfileFormats \
     -lfiniteVolume \
-    
+

@@ -46,7 +46,6 @@ SourceFiles
 #include <Eigen/Eigen>
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
-
 /// Structure to implement a newton object for a stationary NS problem
 struct newton_burgers: public newton_argument<double>
 {

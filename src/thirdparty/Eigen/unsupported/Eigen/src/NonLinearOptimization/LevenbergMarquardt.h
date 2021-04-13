@@ -157,7 +157,9 @@ template<typename FunctorType, typename Scalar>
 LevenbergMarquardtSpace::Status
 LevenbergMarquardt<FunctorType,Scalar>::minimize(FVectorType  &x)
 {
+    // Info << " # DEBUG LevenbergMarquardt.h, line 160 # " << endl;
     LevenbergMarquardtSpace::Status status = minimizeInit(x);
+    // Info << " # DEBUG LevenbergMarquardt.h, line 161 # " << endl;
     if (status==LevenbergMarquardtSpace::ImproperInputParameters)
         return status;
     do {
@@ -220,7 +222,9 @@ LevenbergMarquardt<FunctorType,Scalar>::minimizeOneStep(FVectorType  &x)
     eigen_assert(x.size()==n); // check the caller is not cheating us
 
     /* calculate the jacobian matrix. */
+    // Info << " # DEBUG LevenbergMarquardt.h, line 225 # " << endl;
     Index df_ret = functor.df(x, fjac);
+    // Info << " # DEBUG LevenbergMarquardt.h, line 226 # " << endl;
     if (df_ret<0)
         return LevenbergMarquardtSpace::UserAsked;
     if (df_ret>0)

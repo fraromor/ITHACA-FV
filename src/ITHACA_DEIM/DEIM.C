@@ -91,18 +91,23 @@ DEIM<T>::DEIM (PtrList<T>& s, label MaxModesA, label MaxModesB, word MatrixName)
     Eigen::MatrixXd cA;
     Eigen::SparseMatrix<double> rA;
     Eigen::VectorXd rhoA(1);
+    // Info << " # DEBUG DEIM.C, line 94 # " << endl;
     Matrix_Modes = ITHACAPOD::DEIMmodes(SnapShotsMatrix, MaxModesA, MaxModesB,
                                         MatrixName);
+    // Info << " # DEBUG DEIM.C, line 97 # " << endl;
     Ncells = getNcells(std::get<1>(Matrix_Modes)[0].rows());
+    // Info << " # DEBUG DEIM.C, line 99 # " << endl;
     label ind_rowA, ind_colA, xyz_rowA, xyz_colA;
     ind_rowA = ind_colA = xyz_rowA = xyz_colA = 0;
     double maxA = EigenFunctions::max(std::get<0>(Matrix_Modes)[0], ind_rowA,
                                       ind_colA);
+                                    //   Info << " # DEBUG DEIM.C, line 104 # " << endl;
     label ind_rowAOF = ind_rowA;
     label ind_colAOF = ind_colA;
     check3DIndices(ind_rowAOF, ind_colAOF, xyz_rowA, xyz_colA);
     Pair <label> indA(ind_rowAOF, ind_colAOF);
     Pair <label> xyzA(xyz_rowA, xyz_colA);
+    // Info << " # DEBUG DEIM.C, line 110 # " << endl;
     xyz_A.append(xyzA);
     rhoA(0) = maxA;
     magicPointsA.append(indA);
@@ -111,6 +116,7 @@ DEIM<T>::DEIM (PtrList<T>& s, label MaxModesA, label MaxModesB, word MatrixName)
                                      std::get<0>(Matrix_Modes)[0].cols());
     Pnow.insert(ind_rowA, ind_colA) = 1;
     PA.append(Pnow);
+    // Info << " # DEBUG DEIM.C, line 120 # " << endl;
 
     for (label i = 1; i < MaxModesA; i++)
     {
@@ -199,6 +205,7 @@ PtrList<S> DEIM<T>::generateSubmeshes(label layers, fvMesh& mesh, S field,
     fvMeshSubset* submesh;
     PtrList<S> fields;
     List<label> indices;
+    // Info << " # DEBUG DEIM.C, line 202 # " << endl;
     volScalarField Indici
     (
         IOobject
@@ -212,12 +219,12 @@ PtrList<S> DEIM<T>::generateSubmeshes(label layers, fvMesh& mesh, S field,
         mesh,
         dimensionSet(0, 0, 0, 0, 0)
     );
-
+    // Info << " # DEBUG DEIM.C, line 216 # " << endl;
     if (!secondTime)
     {
         Indici = Indici * 0;
     }
-
+    // Info << " # DEBUG DEIM.C, line 221 # " << endl;
     for (label i = 0; i < magicPoints.size(); i++)
     {
         submesh = new fvMeshSubset(mesh);

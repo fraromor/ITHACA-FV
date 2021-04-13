@@ -32,6 +32,7 @@ License This file is part of ITHACA-FV ITHACA-FV is free software: you can
 #include "DEIM.H"
 #include "ReducedBurgers.H"
 #include "NonlinearReducedBurgers_central.H"
+#include "NMLSPGMDEIMBurgers.H"
 #include "ITHACAstream.H"
 #include "cnpy.H"
 #include <chrono>
@@ -49,6 +50,7 @@ public:
         : Burgers(argc, argv),
           U(_U())
     {
+        Info << " # DEBUG 00burgers.C, line 52 # " << endl;
     }
 
     // Fields To Perform
@@ -150,6 +152,7 @@ void test_one_parameter_initial_velocity(tutorial00);
 void nonlinear_one_parameter_initial_velocity(tutorial00);
 void nonlinear_test_rec(tutorial00);
 void nonlinear_test_data(tutorial00);
+void nonlinear_one_parameter_initial_velocity_hr_train(tutorial00);
 void nonlinear_one_parameter_initial_velocity_hr(tutorial00);
 
 int main(int argc, char *argv[])
@@ -195,6 +198,11 @@ int main(int argc, char *argv[])
     {
         // reconstruct NM-LSTM predicted solutions and compute rel L2 error
         nonlinear_test_data(example);
+    }
+    else if (std::strcmp(argv[1], "hrtrain") == 0)
+    {
+        // NM-LSPG-HR
+        nonlinear_one_parameter_initial_velocity_hr_train(example);
     }
     else if (std::strcmp(argv[1], "hr") == 0)
     {
@@ -384,30 +392,30 @@ void test_one_parameter_initial_velocity(tutorial00 test_FOM)
     test_FOM.NL_Umodes = test_FOM.L_Umodes.size();
     test_FOM.evaluateMatrices();
 
-    ReducedBurgers reduced_nonIntrusive(test_FOM);
+    // ReducedBurgers reduced_nonIntrusive(test_FOM);
 
-    // Set values of the reduced_nonIntrusive model
-    reduced_nonIntrusive.nu = 0.0001;
-    reduced_nonIntrusive.tstart = 0;
-    reduced_nonIntrusive.finalTime = 2;
-    reduced_nonIntrusive.dt = 0.001;
-    reduced_nonIntrusive.storeEvery = 0.001;
-    reduced_nonIntrusive.exportEvery = 0.001;
+    // // Set values of the reduced_nonIntrusive model
+    // reduced_nonIntrusive.nu = 0.0001;
+    // reduced_nonIntrusive.tstart = 0;
+    // reduced_nonIntrusive.finalTime = 2;
+    // reduced_nonIntrusive.dt = 0.001;
+    // reduced_nonIntrusive.storeEvery = 0.001;
+    // reduced_nonIntrusive.exportEvery = 0.001;
     //reduced_nonIntrusive.Nphi_u = NmodesUproj;// the initial condition is
     //added to the modes
 
-    Eigen::MatrixXd nonIntrusiveCoeff;
+    // Eigen::MatrixXd nonIntrusiveCoeff;
 
-    nonIntrusiveCoeff = cnpy::load(nonIntrusiveCoeff, "nonIntrusiveCoeff.npy", "rowMajor");
+    // nonIntrusiveCoeff = cnpy::load(nonIntrusiveCoeff, "nonIntrusiveCoeff.npy", "rowMajor");
 
-    // Reconstruct the solution and export it
-    reduced_nonIntrusive.reconstruct(true, "./ITHACAoutput/ReconstructionNonIntrusive/", nonIntrusiveCoeff);
+    // // Reconstruct the solution and export it
+    // reduced_nonIntrusive.reconstruct(true, "./ITHACAoutput/ReconstructionNonIntrusive/", nonIntrusiveCoeff);
 
-    Eigen::MatrixXd errL2UnonIntrusive = ITHACAutilities::errorL2Rel(test_FOM.Ufield, reduced_nonIntrusive.uRecFields);
+    // Eigen::MatrixXd errL2UnonIntrusive = ITHACAutilities::errorL2Rel(test_FOM.Ufield, reduced_nonIntrusive.uRecFields);
 
-    ITHACAstream::exportMatrix(errL2UnonIntrusive, "errL2UnonIntrusive", "matlab",
-                               "./ITHACAoutput/ErrorsL2/");
-    cnpy::save(errL2UnonIntrusive, "./ITHACAoutput/ErrorsL2/errL2UnonIntrusive.npy");
+    // ITHACAstream::exportMatrix(errL2UnonIntrusive, "errL2UnonIntrusive", "matlab",
+    //                            "./ITHACAoutput/ErrorsL2/");
+    // cnpy::save(errL2UnonIntrusive, "./ITHACAoutput/ErrorsL2/errL2UnonIntrusive.npy");
 
     ReducedBurgers reduced_intrusive(test_FOM);
 
@@ -829,69 +837,184 @@ void nonlinear_test_data(tutorial00 test_FOM)
 //     //                            "./ITHACAoutput/ErrorsL2/errL2UNMLSPG.npy");
 // }
 
-void nonlinear_one_parameter_initial_velocity_hr(tutorial00 train_FOM)
+void nonlinear_one_parameter_initial_velocity_hr_train(tutorial00 train_FOM)
 {
     // Read parameters from ITHACAdict file
+    Info << " # DEBUG 00burgers.C, line 835 # " << endl;
     ITHACAparameters *para = ITHACAparameters::getInstance(train_FOM._mesh(),
                                                            train_FOM._runTime());
     int NmodesUout = para->ITHACAdict->lookupOrDefault<int>("NmodesUout", 15);
     int NmodesUproj = para->ITHACAdict->lookupOrDefault<int>("NmodesUproj", 10);
     int NmodesUtest = para->ITHACAdict->lookupOrDefault<int>("NmodesUtest", 100);
-    int NUmodes = para->ITHACAdict->lookupOrDefault<int>("NUmodes", 15);
     int NmodesDEIMA = para->ITHACAdict->lookupOrDefault<int>("NmodesDEIMA", 15);
     int NmodesDEIMB = para->ITHACAdict->lookupOrDefault<int>("NmodesDEIMB", 15);
     int NnonlinearModes = 4; //para->ITHACAdict->lookupOrDefault<int>("NnonlinearModes", 4);
 
     /// Set the number of parameters
     train_FOM.Pnumber = 1;
-
-    /// Set the dimension of the test set
-    train_FOM.Tnumber = NmodesUtest;
-
-    // load the test samples
-    Eigen::MatrixXd mu;
-    train_FOM.mu = cnpy::load(mu, "parTest.npy");
+    /// Set the dimension of the training set
+    train_FOM.Tnumber = 6;
+    /// Instantiates a void Pnumber-by-Tnumber matrix mu for the parameters and
+    /// a void Pnumber-by-2 matrix mu_range for the ranges
+    train_FOM.setParameters();
+    // Set the parameter ranges
+    train_FOM.mu_range(0, 0) = 0.8;
+    train_FOM.mu_range(0, 1) = 1.2;
+    // Generate a number of Tnumber linearly equispaced samples inside the
+    // parameter range
+    train_FOM.genEquiPar();
+    cnpy::save(train_FOM.mu, "parTrain.npy");
 
     // Time parameters
     train_FOM.startTime = 0;
     train_FOM.finalTime = 2;
     train_FOM.timeStep = 0.001;
     train_FOM.writeEvery = 1;
+    train_FOM.exportDEIMEvery = 10; // ! necessary for MDEIM
+
+    // Perform The Offline Solve;
+    // if(!ITHACAutilities::check_folder("./ITHACAoutput/Offline/Training/"))
+    // {
+    //     train_FOM.offline = false;
+    //     Info << "Offline Train data already exist, reading existing data" << endl;
+    // }
+    train_FOM.offline = false;
+    train_FOM.offlineSolveInitialVelocity("ITHACAoutput/Offline/Training/");
+
+    // Perform a POD decomposition for velocity
+    if (!ITHACAutilities::check_folder("./ITHACAoutput/POD/"))
+    {
+        ITHACAPOD::getModes(train_FOM.Ufield, train_FOM.Umodes, train_FOM._U().name(),
+                            train_FOM.podex, 0, 0, NmodesUout);
+
+        Eigen::MatrixXd SnapMatrix = Foam2Eigen::PtrList2Eigen(train_FOM.Ufield);
+        cnpy::save(SnapMatrix, "npSnapshots.npy");
+
+        train_FOM.project("./Matrices", NmodesUproj);
+
+        // The initial conditions are used as the first mode
+        ITHACAstream::exportFields(train_FOM.L_Umodes, "./ITHACAoutput/POD_and_initial/", "U");
+
+        Eigen::MatrixXd modes = Foam2Eigen::PtrList2Eigen(train_FOM.L_Umodes);
+        // Info << "modes size: " << modes.size() << endl;
+        cnpy::save(modes, "npInitialAndModes.npy");
+    }
+    else
+    {
+        // load modes from training
+        train_FOM.NUmodes = NmodesUproj;
+        ITHACAstream::read_fields(train_FOM.L_Umodes, "U", "./ITHACAoutput/POD_and_initial/", 1, NmodesUout);
+        train_FOM.NL_Umodes = train_FOM.L_Umodes.size();
+    }
+
+    // perform MDEIM
+    train_FOM.performMDEIM(NmodesDEIMA, NmodesDEIMB);
+}
+
+void nonlinear_one_parameter_initial_velocity_hr(tutorial00 test_FOM)
+{
+    // Read parameters from ITHACAdict file
+    ITHACAparameters *para = ITHACAparameters::getInstance(test_FOM._mesh(),
+                                                           test_FOM._runTime());
+    int NmodesUout = para->ITHACAdict->lookupOrDefault<int>("NmodesUout", 15);
+    int NmodesUproj = para->ITHACAdict->lookupOrDefault<int>("NmodesUproj", 10);
+    int NmodesUtest = para->ITHACAdict->lookupOrDefault<int>("NmodesUtest", 100);
+    int NmodesDEIMA = para->ITHACAdict->lookupOrDefault<int>("NmodesDEIMA", 15);
+    int NmodesDEIMB = para->ITHACAdict->lookupOrDefault<int>("NmodesDEIMB", 15);
+    int DimDEIM = para->ITHACAdict->lookupOrDefault<int>("DimDEIM", 15);
+    int NnonlinearModes = 4; //para->ITHACAdict->lookupOrDefault<int>("NnonlinearModes", 4);
+
+    /// Set the number of parameters
+    test_FOM.Pnumber = 1;
+
+    /// Set the dimension of the test set
+    test_FOM.Tnumber = NmodesUtest;
+
+    // load the test samples
+    Eigen::MatrixXd mu;
+    test_FOM.mu = cnpy::load(mu, "parTest.npy");
+
+    // Time parameters
+    test_FOM.startTime = 0;
+    test_FOM.finalTime = 2;
+    test_FOM.timeStep = 0.001;
+    test_FOM.writeEvery = 1;
 
     Eigen::MatrixXd initial_latent;
-    cnpy::load(initial_latent, "./Autoencoders/ConvolutionalAe/latent_initial_4.npy");
+    cnpy::load(initial_latent, "./Autoencoders/ConvolutionalAe/latent_initial_" + std::to_string(NnonlinearModes) + ".npy");
 
     std::cout << "LATENT INIT " << initial_latent << std::endl;
 
     // Perform The Offline Solve;
-    if(!ITHACAutilities::check_folder("./ITHACAoutput/Offline/Training/"))
+    if (!ITHACAutilities::check_folder("./ITHACAoutput/Offline/Test/"))
     {
-        train_FOM.offline = false;
-        Info << "Offline Train data already exist, reading existing data" << endl;
+        test_FOM.offline = false;
+        // Info << "Offline Test data already exist, reading existing data" <<
+        // endl;
     }
 
-    train_FOM.offlineSolveInitialVelocity("ITHACAoutput/Offline/Training/");
+    test_FOM.offlineSolveInitialVelocity("./ITHACAoutput/Offline/Test/");
 
     // load modes from training
-    train_FOM.NUmodes = NmodesUproj;
-    ITHACAstream::read_fields(train_FOM.L_Umodes, "U", "./ITHACAoutput/POD_and_initial/", 1, NmodesUout);
-    train_FOM.NL_Umodes = train_FOM.L_Umodes.size();
+    test_FOM.NUmodes = NmodesUproj;
+    ITHACAstream::read_fields(test_FOM.L_Umodes, "U", "./ITHACAoutput/POD_and_initial/", 1, NmodesUout);
+    test_FOM.NL_Umodes = test_FOM.L_Umodes.size();
 
     // NM-LSPG
-    NonlinearReducedBurgers reduced_nm_lspg(train_FOM, "./Autoencoders/ConvolutionalAe/decoder_gpu_4.pt", NnonlinearModes, initial_latent);
+    Info << " # DEBUG 00burgers.C, line 963 # " << endl;
+    Eigen::MatrixXd indicesBmdeim;
+    cnpy::load(indicesBmdeim, "vecIndB.npy");
+    Eigen::MatrixXd submeshesBmdeim;
+    cnpy::load(submeshesBmdeim, "indices.npy");
+    NMLSPGMDEIMBurgers reduced_nm_lspg_hr(test_FOM,
+     "./Autoencoders/ConvolutionalAe/modelDEIM_gpu_"+ std::to_string(NnonlinearModes) +".pt", NnonlinearModes,
+      initial_latent, indicesBmdeim, submeshesBmdeim, DimDEIM);
 
     // Set values of the reduced model
-    reduced_nm_lspg.nu = 0.0001;
-    reduced_nm_lspg.tstart = 0;
-    reduced_nm_lspg.finalTime = 2;
-    reduced_nm_lspg.dt = 0.001;
-    reduced_nm_lspg.storeEvery = 0.01;     // do not store and export
-    reduced_nm_lspg.exportEvery = 10;      // do not store and export
-    reduced_nm_lspg.exportResidual = 0.01; // save the residuals for hr
+    reduced_nm_lspg_hr.nu = 0.0001;
+    reduced_nm_lspg_hr.tstart = 0;
+    reduced_nm_lspg_hr.finalTime = 2;
+    reduced_nm_lspg_hr.dt = 0.001;
+    reduced_nm_lspg_hr.storeEvery = 0.001;
+    reduced_nm_lspg_hr.exportEvery = 0.001;
 
-    // reduced_nm_lspg.solveOnline(train_FOM.mu, 1);
-    // ITHACAstream::exportFields(reduced_nm_lspg.residualsList, "./RESIDUAL", "res");
-    ITHACAstream::read_fields(reduced_nm_lspg.residualsList, "res", "RESIDUAL/", 1);
-    Eigen::MatrixXd residualsListEigen = Foam2Eigen::PtrList2Eigen(reduced_nm_lspg.residualsList);
-    cnpy::save(residualsListEigen, "residuals.npy");
+    Info << " # DEBUG 00burgers.C, line 974 # " << endl;
+    reduced_nm_lspg_hr.NMLSPG_MMDEIM(NmodesDEIMA, NmodesDEIMB);
+    Info << " # DEBUG 00burgers.C, line 976 # " << endl;
+
+    reduced_nm_lspg_hr.solveOnline(test_FOM.mu, 1);
+    Info << " # DEBUG 00burgers.C, line 979 # " << endl;
+    ITHACAstream::exportMatrix(reduced_nm_lspg_hr.online_solution, "red_coeff", "python", "./ITHACAoutput/red_coeff_NM_LSPG");
+    Info << " # DEBUG 00burgers.C, line 980 # " << endl;
+    reduced_nm_lspg_hr.reconstruct("./Autoencoders/ConvolutionalAe/decoder_gpu_"+ std::to_string(NnonlinearModes) +".pt",
+                                    test_FOM, true, "./ITHACAoutput/ReconstructionNMLSPGHR/");
+    Info << " # DEBUG 00burgers.C, line 983 # " << endl;
+
+    // PtrList<volVectorField> exportNM;
+    // for (int i = 0; i < reduced_nm_lspg_hr.uRecFields.size(); i++)
+    // {
+    //     exportNM.append(reduced_nm_lspg_hr.uRecFields[i]-test_FOM.Ufield[i]);
+    // }
+
+    // ITHACAstream::exportFields(exportNM, "./ITHACAoutput/ReconstructionNMLSPGHRError/", "uRec");
+    // // reduced_nm_lspg_hr.reconstruct(true,"./ITHACAoutput/ReconstructionNMLSPG/");
+
+    // // Info << " #################### DEBUG
+    // // ~/OpenFOAM/OpenFOAM-v2006/applications/utilities/ITHACA-FV/tutorials/CFD/00burgers/00burgers.C,
+    // // line 482 #################### " << test_FOM.Ufield.size() << " " <<
+    // // reduced_nm_lspg_hr.uRecFields.size() << " " <<
+    // // reduced_nm_lspg_hr.online_solution.size() << endl;
+
+    // Eigen::MatrixXd errL2UNMLSPG = ITHACAutilities::errorL2Rel(test_FOM.Ufield,
+    //                                                            reduced_nm_lspg_hr.uRecFields);
+
+    // ITHACAstream::exportMatrix(errL2UNMLSPG, "errL2UNMLSPG", "matlab",
+    //                            "./ITHACAoutput/ErrorsL2/");
+    // cnpy::save(errL2UNMLSPG, "./ITHACAoutput/ErrorsL2/errL2UNMLSPG.npy");
+
+    // auto errLinfUNMLSPG = ITHACAutilities::errorLinfRel(test_FOM.Ufield,
+    //                                                            reduced_nm_lspg_hr.uRecFields);
+    // ITHACAstream::exportMatrix(errLinfUNMLSPG, "errLinfUNMLSPG", "matlab",
+    //                            "./ITHACAoutput/ErrorsLinf/");
+    // cnpy::save(errLinfUNMLSPG, "./ITHACAoutput/ErrorsLinf/errLinfUNMLSPG.npy");
 }

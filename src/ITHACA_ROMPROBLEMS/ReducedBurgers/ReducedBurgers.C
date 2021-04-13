@@ -506,11 +506,14 @@ void ReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
         Eigen::MatrixXd tmp_sol(Nphi_u + 1, 1);
         tmp_sol(0) = time;
         tmp_sol.col(0).tail(y.rows()) = y;
+        Info << " # DEBUG ReducedBurgers.C, line 509 # " << endl;
 
         online_solution[counter2] = tmp_sol;
         counter2++;
         counter++;
         nextStore += numberOfStores;
+        Info << " # DEBUG ReducedBurgers.C, line 515 # " << endl;
+
         // Create nonlinear solver object
         Eigen::HybridNonLinearSolver<newton_burgers> hnls(newton_object);
         // Set output colors for fancy output
@@ -534,10 +537,13 @@ void ReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
                 }
             }
 
+            Info << " # DEBUG ReducedBurgers.C, line 540 # " << endl;
             auto start = std::chrono::system_clock::now();
             Eigen::VectorXd res(y);
             res.setZero();
+            Info << " # DEBUG ReducedBurgers.C, line 544 # " << endl;
             hnls.solve(y);
+            Info << " # DEBUG ReducedBurgers.C, line 546 # " << endl;
 
             if (problem->bcMethod == "lift")
             {
@@ -553,8 +559,9 @@ void ReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
                     }
                 }
             }
-
+            Info << " # DEBUG ReducedBurgers.C, line 556 # " << endl;
             newton_object.operator()(y, res);
+            Info << " # DEBUG ReducedBurgers.C, line 558 # " << endl;
             newton_object.yOldOld = newton_object.y_old;
             newton_object.y_old = y;
             auto end = std::chrono::system_clock::now();

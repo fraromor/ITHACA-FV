@@ -46,6 +46,7 @@ SourceFiles
 #include "fvCFD.H"
 #include "IOmanip.H"
 #include "ReducedProblem.H"
+#include "NonlinearReducedBurgers_central.H"
 #include "burgers.H"
 #include "DEIM.H"
 #include "ITHACAutilities.H"
@@ -55,56 +56,6 @@ SourceFiles
 #include <unsupported/Eigen/NumericalDiff>
 #include <torch/script.h>
 #include <utility>
-
-class Embedding
-{
-public:
-    /// latent dimension
-    int latent_dim;
-
-    /// number of cells
-    int output_dim;
-
-    /// decoder module
-    autoPtr<torch::jit::script::Module> decoder;
-
-    /// Initial condition
-    autoPtr<volVectorField> _U0;
-
-    /// value of the decoder at the zero vector
-    autoPtr<volVectorField> _g0;
-
-    ///
-    Eigen::MatrixXd latent_initial;
-
-    /// DEBUG commodity counter
-    int counter = 0;
-    PtrList<volVectorField> save_field;
-
-    Embedding() {}
-    Embedding(int latent_dim, fileName decoder_path, volVectorField &U0, Eigen::MatrixXd lat_init);
-
-    Embedding(Embedding &embedding) : latent_dim{embedding.latent_dim},
-                                      output_dim{embedding.output_dim},
-                                      decoder{embedding.decoder},
-                                      _U0{embedding._U0},
-                                      _g0{embedding._g0}{}
-
-    Embedding(Embedding &&embedding) : latent_dim{std::move(embedding.latent_dim)},
-                                       output_dim{embedding.output_dim},
-                                      decoder{std::move(embedding.decoder)},
-                                      _U0{std::move(embedding._U0)},
-                                      _g0{std::move(embedding._g0)}{}
-
-    autoPtr<volVectorField> forward(const Eigen::VectorXd &x, const scalar mu);
-    autoPtr<Eigen::MatrixXd> jacobian(const Eigen::VectorXd &x, const scalar mu);
-
-    std::pair<autoPtr<volVectorField>, autoPtr<Eigen::MatrixXd>> forward_with_gradient(const Eigen::VectorXd &x, const scalar mu);
-
-    autoPtr<volVectorField> embedding_ref(const scalar mu);
-
-    ~Embedding(){};
-};
 
 class EmbeddingMDEIM
 {
@@ -122,7 +73,7 @@ public:
     Eigen::MatrixXd latent_initial;
 
     /// mdeim restricted latent variables image
-    Eigen::VectorXd initial_mdeim;
+    Eigen::MatrixXd initial_mdeim;
 
     /// mdeim restricted initial field
     Eigen::VectorXd U0_mdeim;
@@ -135,12 +86,12 @@ public:
     EmbeddingMDEIM(int latent_dim, fileName decoder_path, volVectorField &U0, Eigen::MatrixXd lat_init);
 
     EmbeddingMDEIM(EmbeddingMDEIM &embedding) : latent_dim{embedding.latent_dim},
-                                      decoder{embedding.decoder},
-                                      _U0{embedding._U0}{};
+                                                decoder{embedding.decoder},
+                                                _U0{embedding._U0} {};
 
     EmbeddingMDEIM(EmbeddingMDEIM &&embedding) : latent_dim{std::move(embedding.latent_dim)},
-                                      decoder{std::move(embedding.decoder)},
-                                      _U0{std::move(embedding._U0)}{};
+                                                 decoder{std::move(embedding.decoder)},
+                                                 _U0{std::move(embedding._U0)} {};
 
     Eigen::VectorXd forward(const Eigen::VectorXd &x, const scalar mu);
     Eigen::VectorXd embedding_ref(const scalar mu);
@@ -148,56 +99,13 @@ public:
     ~EmbeddingMDEIM(){};
 };
 
-/// Structure to implement a newton object for a non-stationary NS problem
-struct newton_nmlspg_burgers : public newton_argument<double>
-{
-public:
-    newton_nmlspg_burgers() {}
-    newton_nmlspg_burgers(int Nx, int Ny, Burgers &problem, Embedding &embedding, volVectorField& field) :
-    newton_argument<double>(Nx, Ny),
-    problem(&problem),
-    N_BC(problem.inletIndex.rows()),
-    embedding(&embedding)
-    {
-
-        if (problem.liftfield.size() != 0)
-        {
-            Nphi_u = problem.NUmodes + problem.liftfield.size();
-        }
-        else
-        {
-            Nphi_u = problem.NUmodes + 1;
-        }
-    }
-
-    int operator()(const Eigen::VectorXd &x, Eigen::VectorXd &fvec) const;
-    int system(const Eigen::VectorXd &x);
-    // int df(const Eigen::VectorXd &x, Eigen::MatrixXd &fjac) const;
-
-    Burgers *problem;
-    int Nphi_u;
-    int N_BC;
-    dimensionedScalar nu;
-    scalar dt;
-    scalar mu;
-
-    Embedding *embedding;
-    autoPtr<volVectorField> g_old;
-    autoPtr<fvVectorMatrix> system_mdeim;
-
-    Eigen::VectorXd y_old;
-    Eigen::VectorXd yOldOld;
-    Eigen::VectorXd BC;
-    Eigen::MatrixXd tauU;
-};
-
 class DEIM_burgers : public DEIM<fvVectorMatrix>
 {
-    public:
-        using DEIM::DEIM;
+public:
+    using DEIM::DEIM;
 
-        PtrList<volVectorField> fieldsA;
-        PtrList<volVectorField> fieldsB;
+    PtrList<volVectorField> fieldsA;
+    PtrList<volVectorField> fieldsB;
 };
 
 /// Structure to implement a newton object for a non-stationary NS problem
@@ -205,11 +113,10 @@ struct newton_nmlspg_mdeim_burgers : public newton_argument<double>
 {
 public:
     newton_nmlspg_mdeim_burgers() {}
-    newton_nmlspg_mdeim_burgers(int Nx, int Ny, Burgers &problem, EmbeddingMDEIM &embedding, volVectorField& field) :
-    newton_argument<double>(Nx, Ny),
-    problem(&problem),
-    N_BC(problem.inletIndex.rows()),
-    embedding(&embedding)
+    newton_nmlspg_mdeim_burgers(int Nx, int Ny, Burgers &problem, EmbeddingMDEIM &embedding, volVectorField &field) : newton_argument<double>(Nx, Ny),
+                                                                                                                      problem(&problem),
+                                                                                                                      N_BC(problem.inletIndex.rows()),
+                                                                                                                      embedding(&embedding)
     {
 
         if (problem.liftfield.size() != 0)
@@ -223,15 +130,23 @@ public:
     }
 
     int operator()(const Eigen::VectorXd &x, Eigen::VectorXd &fvec) const;
-    void initPseudoInverses(std::tuple<List<Eigen::SparseMatrix<double>>, List<Eigen::VectorXd>> matrixModes);
+    void localAB2generalizedCoord(Eigen::VectorXd matrixBindices);
     Eigen::MatrixXd projectMatrix(Eigen::MatrixXd full_matrix) const;
     Eigen::VectorXd projectVector(Eigen::VectorXd full_vector) const;
-    volVectorField& createFieldFromMagicPoints(Eigen::VectorXd deim_field) const;
     Eigen::VectorXd embedding_ref(const scalar mu) const;
+
+    fvVectorMatrix evaluate_expression(volVectorField &U, const volVectorField &U_old, double mu) const;
+    std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, Eigen::MatrixXd, Eigen::MatrixXd> onlineCoeffsAB(double mu,PtrList<volVectorField> listA, PtrList<volVectorField> listB) const;
+    Eigen::MatrixXd onlineCoeffsA(double mu, PtrList<volVectorField> listA) const;
+    Eigen::MatrixXd onlineCoeffsB(double mu, PtrList<volVectorField> listB) const;
+    void init_old(Eigen::VectorXd& U_old);
+    void rec_field(Eigen::VectorXd& vec, volVectorField& fieldRec, word name);
+    Eigen::VectorXd restrict_decoder();
 
     Burgers *problem;
     int Nphi_u;
     int N_BC;
+    int counterRec{0};
     dimensionedScalar nu;
     scalar dt;
     scalar mu;
@@ -245,9 +160,14 @@ public:
     Eigen::MatrixXd tauU;
 
     autoPtr<DEIM_burgers> mdeim;
-    Eigen::MatrixXd pinvMatrix;// the shape is n_mdeim x n_mdeim
-    Eigen::MatrixXd pinvVector;// the shape is n_deim x n_deim
+    PtrList<volVectorField> listAold;
+    PtrList<volVectorField> listBold;
+    Eigen::VectorXd matrixBindices;
+    int total_submeshes_points;
+    Eigen::MatrixXd pinvAB; // the shape is n_deim x n_mdeim
+    Eigen::MatrixXd pinvBA; // the shape is n_mdeim x n_deim
     Eigen::VectorXd U0_mdeim;
+    int total_mp; // half decoder hyperreduced output length
 };
 
 /*---------------------------------------------------------------------------*\
@@ -270,18 +190,22 @@ public:
     /// @param[in]  problem  a full order steadyNS problem
     /// @param[in]  tipo     Type of pressure stabilisation method you want to use "SUP" for supremizer, "PPE" for pressure Poisson equation.
     ///
-    explicit NMLSPGMDEIMBurgers(Burgers &problem, fileName decoder_path, int latent_dim, Eigen::MatrixXd lat_init, bool mdeim_fl);
+    explicit NMLSPGMDEIMBurgers(Burgers &problem, fileName decoder_path,
+                                int latent_dim, Eigen::MatrixXd lat_init,
+                                Eigen::VectorXd matrixBindices_,
+                                Eigen::VectorXd matrixBsubmeshes_,
+                                 int total_mp_);
 
     ~NMLSPGMDEIMBurgers(){};
 
     /// parameters to be read from the ITHACAdict file
     ITHACAparameters *para;
 
-    /// Decoder
-    autoPtr<Embedding> embedding;
-
     /// DecoderMDEIM
     autoPtr<EmbeddingMDEIM> embedding_mdeim;
+
+    /// Decoder
+    autoPtr<Embedding> embedding;
 
     /// Online inlet velocity vector
     Eigen::MatrixXd vel_now;
@@ -316,14 +240,14 @@ public:
     /// Recontructed velocity fields list
     PtrList<volVectorField> uRecFields;
 
+    /// Latent velocity fields list
+    Eigen::MatrixXd uRecLatent;
+
     /// List of pointers to store the snapshots for residuals
     PtrList<volScalarField> residualsList;
 
     /// List of pointers to store the MDEIM matrix and source term
     PtrList<fvVectorMatrix> matrixMDEIMList;
-
-    /// Newton object used to solve the non linear problem
-    newton_nmlspg_burgers newton_object;
 
     /// Newton object used to solve the mdeim non linear problem
     newton_nmlspg_mdeim_burgers newton_object_mdeim;
@@ -331,14 +255,16 @@ public:
     /// Pointer to the FOM problem
     Burgers *problem;
 
-    /// Number of velocity modes
+    /// Latent space dimension
     int Nphi_u;
 
     /// MDEIM dimensions
     int NUmodes;
     int NmodesDEIMA;
     int NmodesDEIMB;
-
+    Eigen::VectorXd matrixBindices;
+    Eigen::VectorXd matrixBsubmeshes;
+    int total_mp;
 
     /// Number of parametrized boundary conditions
     int N_BC;
@@ -441,17 +367,8 @@ public:
     /// @param[in]  folder        The folder where to output the solutions in case on wants to
     /// @param[in]  printevery    The printevery variabel, when it is 1 the function outputs all stored fields
     ///
-    void reconstruct(bool exportFields = false,
+    void reconstruct(fileName decoder_path, Burgers &problem, bool exportFields = false,
                      fileName folder = "./ITHACAoutput/online_rec");
-
-    ///
-    /// Method to reconstruct the solutions from an online solve.
-    ///
-    /// @param[in]  exportFields  A boolean variable which determines whether to export fields or not
-    /// @param[in]  folder        The folder where to output the solutions in case on wants to
-    /// @param[in]  printevery    The printevery variabel, when it is 1 the function outputs all stored fields
-    ///
-    void reconstruct(bool exportFields, fileName folder, Eigen::MatrixXd redCoeff);
 
     ///
     /// @brief      Sets the online velocity.
@@ -469,8 +386,7 @@ public:
     ///
     void trueProjection(fileName folder);
 
-    void NMLSPG_MMDEIM(int NmodesU, int NmodesDEIMA, int NmodesDEIMB);
-    void OnlineSolveMDEIM(Eigen::MatrixXd mu, int startSnap);
+    void NMLSPG_MMDEIM(int NmodesDEIMA, int NmodesDEIMB);
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

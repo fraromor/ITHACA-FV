@@ -66,9 +66,9 @@ Embedding::Embedding(int dim, fileName decoder_path, volVectorField &U0, Eigen::
 {
     // get the number of degrees of freedom relative to a single component
     output_dim = U0.size(); // 3600
-
+    Info << " # DEBUG NonlinearReducedBurgers_central.C, line 69 # " << endl;
     decoder = autoPtr<torch::jit::script::Module>(new torch::jit::script::Module(torch::jit::load(decoder_path)));
-
+    Info << " # DEBUG NonlinearReducedBurgers_central.C, line 71 # " << endl;
     // define initial velocity field _U0 used to define the reference snapshot
     // and initialize decoder output variable g0
     _U0 = autoPtr<volVectorField>(new volVectorField(U0));
@@ -166,11 +166,6 @@ int newton_nmlspg_burgers::operator()(const Eigen::VectorXd &x, Eigen::VectorXd 
 
     fvec = Foam2Eigen::field2Eigen(a_tmp).col(0).head(this->embedding->output_dim * 2);
 
-    if (mdeim_fl == true)
-    {
-        system_mdeim = std::move(resEqn);
-    }
-
     // this->embedding->save_field.append(a_tmp.clone());
 
     // if (this->embedding->counter == 10) {
@@ -201,8 +196,6 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
              "The variable exportEvery must be an integer multiple of the time step dt.");
     M_Assert(ITHACAutilities::isInteger(exportResidual / dt) == true,
              "The variable storeEvery must be an integer multiple of the time step dt.");
-    M_Assert(ITHACAutilities::isInteger(exportMatricesMDEIM / dt) == true,
-             "The variable storeEvery must be an integer multiple of the time step dt.");
     M_Assert(ITHACAutilities::isInteger(exportEvery / storeEvery) == true,
              "The variable exportEvery must be an integer multiple of the variable storeEvery.");
     // Info << " # DEBUG NonlinearReducedBurgers_central.C, line 266 # " << endl;
@@ -210,11 +203,6 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
 
     // numberOfResiduals defaults to 0 and in that case no residual is saved
     int numberOfResiduals = round(exportResidual / dt);
-    int numberOfMatricesMDEIM = round(exportMatricesMDEIM / dt);
-    if (numberOfMatricesMDEIM == 0)
-    {
-        mdeim_fl = true;
-    }
 
     // Counter of the number of online solutions saved, accounting also time as parameter
     int counter2 = 0;
@@ -359,17 +347,6 @@ void NonlinearReducedBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
                 counterResidual++;
             }
 
-            if (numberOfMatricesMDEIM > 0)
-            {
-                if (counterMatrixMDEIM == numberOfMatrixMDEIMs)
-                {
-                    matrixMDEIMList.append(numDiffobject.system_mdeim);
-                    counterMatrixMDEIM = 1;
-                }
-
-                counterMatrixMDEIM++;
-            }
-
             counter++;
             time = time + dt;
         }
@@ -506,32 +483,4 @@ void NonlinearReducedBurgers::trueProjection(fileName folder)
     uRecFields = problem->L_Umodes.reconstruct(uRec, CoeffU, "uRec");
 
     ITHACAstream::exportFields(uRecFields, folder, "uTrueProjection");
-}
-
-void NonlinearReducedBurgers::OnlineSolve(Eigen::MatrixXd par_new, word Folder)
-{
-    auto t1 = std::chrono::high_resolution_clock::now();
-    auto t2 = std::chrono::high_resolution_clock::now();
-    auto time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-    time_rom = 0;
-
-    for (int i = 0; i < par_new.rows(); i++)
-    {
-        // solve
-        t1 = std::chrono::high_resolution_clock::now();
-        Eigen::MatrixXd thetaonA = DEIMmatrice->onlineCoeffsA(par_new.row(i));
-        Eigen::MatrixXd thetaonB = DEIMmatrice->onlineCoeffsB(par_new.row(i));
-        Eigen::MatrixXd A = EigenFunctions::MVproduct(ReducedMatricesA, thetaonA);
-        Eigen::VectorXd B = EigenFunctions::MVproduct(ReducedVectorsB, thetaonB);
-        Eigen::VectorXd x = A.fullPivLu().solve(B);
-        Eigen::VectorXd full = ModesTEig * x;
-        t2 = std::chrono::high_resolution_clock::now();
-        time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-        time_rom += time_span.count();
-        // Export
-        volScalarField Tred("Tred", T);
-        Tred = Foam2Eigen::Eigen2field(Tred, full);
-        ITHACAstream::exportSolution(Tred, name(i + 1), "./ITHACAoutput/" + Folder);
-        Tonline.append((Tred).clone());
-    }
 }
