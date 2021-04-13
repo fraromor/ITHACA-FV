@@ -986,7 +986,7 @@ void nonlinear_one_parameter_initial_velocity_hr(tutorial00 test_FOM)
     Info << " # DEBUG 00burgers.C, line 979 # " << endl;
     ITHACAstream::exportMatrix(reduced_nm_lspg_hr.online_solution, "red_coeff", "python", "./ITHACAoutput/red_coeff_NM_LSPG");
     Info << " # DEBUG 00burgers.C, line 980 # " << endl;
-    reduced_nm_lspg_hr.reconstruct("./Autoencoders/ConvolutionalAe/decoder_gpu_"+ std::to_string(NnonlinearModes) +".pt",
+    reduced_nm_lspg_hr.reconstructNM("./Autoencoders/ConvolutionalAe/decoder_gpu_"+ std::to_string(NnonlinearModes) +".pt",
                                     test_FOM, true, "./ITHACAoutput/ReconstructionNMLSPGHR/");
     Info << " # DEBUG 00burgers.C, line 983 # " << endl;
 

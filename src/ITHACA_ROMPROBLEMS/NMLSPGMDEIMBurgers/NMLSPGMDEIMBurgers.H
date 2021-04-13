@@ -367,7 +367,7 @@ public:
     /// @param[in]  folder        The folder where to output the solutions in case on wants to
     /// @param[in]  printevery    The printevery variabel, when it is 1 the function outputs all stored fields
     ///
-    void reconstruct(fileName decoder_path, Burgers &problem, bool exportFields = false,
+    void reconstructNM(fileName decoder_path, Burgers &problem, bool exportFields = false,
                      fileName folder = "./ITHACAoutput/online_rec");
 
     ///

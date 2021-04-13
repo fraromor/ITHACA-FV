@@ -315,7 +315,7 @@ void Burgers::performMDEIM(int NmodesDEIMA, int NmodesDEIMB)
         i++;
     }
 
-    std::cout << "MP vector: " << vec << std::endl;
+    std::cout << "MP vector: " << vec.transpose() << std::endl;
     cnpy::save(vec, "magicPoints.npy");
 
     std::cout << "vec ind B: " << vec_ind.transpose() << std::endl;

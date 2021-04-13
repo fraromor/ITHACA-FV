@@ -172,9 +172,11 @@ Eigen::MatrixXd newton_nmlspg_mdeim_burgers::onlineCoeffsB(double mu, PtrList<vo
 
 fvVectorMatrix newton_nmlspg_mdeim_burgers::evaluate_expression(volVectorField& U, const volVectorField& U_old, double mu) const
 {
+    // TODO create phi variable and move it at the end of time step ?
     fvMesh& mesh  =  const_cast<fvMesh&>(U.mesh());
-    auto phi = linearInterpolate(U) & mesh.Sf();
+    auto phi = linearInterpolate(U_old) & mesh.Sf();
 
+    // TODO implement outside ?
     volVectorField &tmp = U.oldTime();
     tmp = U_old;
 
@@ -239,7 +241,7 @@ void newton_nmlspg_mdeim_burgers::rec_field(Eigen::VectorXd& vec, volVectorField
     for (int i; i<mdeim->magicPointsA.size(); i++)
     {
         // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 241 # " << mdeim->xyz_A[i].second() << " " << mdeim->magicPointsA[i].second() << endl;
-        fieldRec[mdeim->magicPointsA[i].second()][mdeim->xyz_A[i].second()] = 1;//vec[k];
+        fieldRec[mdeim->magicPointsA[i].second()][mdeim->xyz_A[i].second()] = vec[k];
         k++;
     }
     for (int i; i<mdeim->magicPointsB.size(); i++)
@@ -247,7 +249,7 @@ void newton_nmlspg_mdeim_burgers::rec_field(Eigen::VectorXd& vec, volVectorField
         if (matrixBindices(i)==1)
         {
             // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 249 # " << mdeim->xyz_B[i] << " " << mdeim->magicPointsB[i] << endl;
-            fieldRec[mdeim->magicPointsB[i]][mdeim->xyz_B[i]] = 1;//vec[k];
+            fieldRec[mdeim->magicPointsB[i]][mdeim->xyz_B[i]] = vec[k];
             k++;
         }
     }
@@ -257,6 +259,7 @@ void newton_nmlspg_mdeim_burgers::rec_field(Eigen::VectorXd& vec, volVectorField
     saved.append(fieldRec);
     ITHACAstream::exportFields(saved, "NMReconstructed", name+std::to_string(counterRec));
     counterRec++;
+    Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 262 # " << endl;
 
 }
 
@@ -268,9 +271,9 @@ Eigen::VectorXd newton_nmlspg_mdeim_burgers::restrict_decoder()
 
     for (int i = 0; i < mdeim->fieldsA.size(); i++)
     {
-        Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 271 # " << i << endl;
-        Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 272 # " << mdeim->xyz_A[i].second() << " " << mdeim->localMagicPointsA[i].second() << endl;
-        Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 272 # " << listAold[i][mdeim->xyz_A[i].second()][mdeim->localMagicPointsA[i].second()] << endl;
+        // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 271 # " << i << endl;
+        // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 272 # " << mdeim->xyz_A[i].second() << " " << mdeim->localMagicPointsA[i].second() << endl;
+        // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 272 # " << listAold[i][mdeim->xyz_A[i].second()][mdeim->localMagicPointsA[i].second()] << endl;
         g_restricted(i) = listAold[i][mdeim->xyz_A[i].second()][mdeim->localMagicPointsA[i].second()];
 
     }
@@ -281,9 +284,9 @@ Eigen::VectorXd newton_nmlspg_mdeim_burgers::restrict_decoder()
     {
         if (matrixBindices(i)==1)
         {
-            Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 281 # " << i << " " << k << " " << j << endl;
-            Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 285 # " << mdeim->xyz_B[i] << " " << mdeim->localMagicPointsB[i] << endl;
-            Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 283 # " << listBold[j][mdeim->xyz_B[i]][mdeim->localMagicPointsB[i]] << endl;
+            // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 281 # " << i << " " << k << " " << j << endl;
+            // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 285 # " << mdeim->xyz_B[i] << " " << mdeim->localMagicPointsB[i] << endl;
+            // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 283 # " << listBold[j][mdeim->xyz_B[i]][mdeim->localMagicPointsB[i]] << endl;
             g_restricted(k) = listBold[j][mdeim->xyz_B[i]][mdeim->localMagicPointsB[i]];
             k++;
             j++;
@@ -398,10 +401,11 @@ int newton_nmlspg_mdeim_burgers::operator()(const Eigen::VectorXd &x, Eigen::Vec
     // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 274 # " << mdeim->fieldsA.size() << " " << total_mp-mdeim->fieldsA.size()<< endl;
 
     // solve the block system, for the A and B magicPoints separately
-    fvec.head(mdeim->fieldsA.size()) =  AA.asDiagonal() * g_restrictedA - pinvBA * BA;
+    fvec.head(mdeim->fieldsA.size()) =  AA.asDiagonal() * g_restrictedA - BA;//pinvBA * BA;
     // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 268 # " << endl;
-    fvec.tail(total_mp-mdeim->fieldsA.size()) =  (pinvAB * AB).asDiagonal() * g_restrictedB - BB;
+    fvec.tail(total_mp-mdeim->fieldsA.size()) =  AB.asDiagonal() * g_restrictedB - BB;//(pinvAB * AB).asDiagonal() * g_restrictedB - BB;
 
+    std::cout << "Residual norm: " << fvec.norm() << std::endl;
     return 0;
 }
 
@@ -675,6 +679,9 @@ void NMLSPGMDEIMBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
         // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 382 # " << endl;
         newton_object_mdeim.g_old = embedding_mdeim->forward(y, mu(0, n_param)) + refTerm ;
         newton_object_mdeim.init_old(newton_object_mdeim.g_old);
+        auto vec_rec = newton_object_mdeim.restrict_decoder();
+        newton_object_mdeim.rec_field(vec_rec, problem->L_Umodes[0], "U");
+
 
         // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 381 # " << endl;
         // Set some properties of the newton object
@@ -786,14 +793,14 @@ void NMLSPGMDEIMBurgers::solveOnline(Eigen::MatrixXd mu, int startSnap)
             time = time + dt;
         }
     }
-    // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 495 # " << endl;
+    Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 495 # " << endl;
     cnpy::save(uRecLatent, "./ITHACAoutput/DEIM/latentHyperReduced.npy");
-    // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 497 # " << endl;
+    Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 497 # " << endl;
 }
 
 // * * * * * * * * * * * * * * *  Evaluation  * * * * * * * * * * * * * //
 
-void NMLSPGMDEIMBurgers::reconstruct(fileName decoder_path,
+void NMLSPGMDEIMBurgers::reconstructNM(fileName decoder_path,
                                      Burgers& problem, bool exportFields,
                                      fileName folder)
 {
@@ -803,10 +810,10 @@ void NMLSPGMDEIMBurgers::reconstruct(fileName decoder_path,
         ITHACAutilities::createSymLink(folder);
     }
 
-    // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 516 # " << endl;
+    Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 516 # " << endl;
     // problem->L_Umodes is used to create volVectorFields
-    embedding = autoPtr<Embedding>(new Embedding(Nphi_u, decoder_path, problem.L_Umodes[0], embedding_mdeim->latent_initial));
-    // Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 519 # " << endl;
+    embedding = autoPtr<Embedding>(new Embedding(Nphi_u, decoder_path, problem.Ufield[0], embedding_mdeim->latent_initial));
+    Info << " # DEBUG NMLSPGMDEIMBurgers.C, line 519 # " << endl;
 
     int counter = 0;
     int nextwrite = 0;
